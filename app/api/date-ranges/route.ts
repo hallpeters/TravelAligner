@@ -85,7 +85,14 @@ export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { id } = await req.json();
-  await query('DELETE FROM date_ranges WHERE id = $1 AND user_id = $2', [id, session.userId]);
+  const { id, date } = await req.json();
+  if (date) {
+    await query(
+      'DELETE FROM date_ranges WHERE user_id = $1 AND start_date <= $2 AND end_date >= $2',
+      [session.userId, date]
+    );
+  } else {
+    await query('DELETE FROM date_ranges WHERE id = $1 AND user_id = $2', [id, session.userId]);
+  }
   return NextResponse.json({ ok: true });
 }

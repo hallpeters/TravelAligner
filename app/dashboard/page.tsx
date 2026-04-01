@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Calendar from '@/components/Calendar';
-import DateRangeManager from '@/components/DateRangeManager';
+import TripWindowsPanel from '@/components/TripWindowsPanel';
 import FriendsManager from '@/components/FriendsManager';
 import YearOverview from '@/components/YearOverview';
 
@@ -84,12 +84,12 @@ export default function Dashboard() {
             {calView === 'month' ? (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
                 <Calendar refreshKey={calendarKey} />
-                <DateRangeManager onRefresh={refreshCalendar} />
+                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} />
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
                 <YearOverview refreshKey={calendarKey} />
-                <DateRangeManager onRefresh={refreshCalendar} />
+                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} />
               </div>
             )}
           </div>

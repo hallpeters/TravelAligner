@@ -30,6 +30,7 @@ export default function YearOverview({ refreshKey }: { refreshKey: number }) {
   const [year, setYear] = useState(today.getFullYear());
   const [data, setData] = useState<CalendarData>({});
   const [loading, setLoading] = useState(false);
+  const [tooltip, setTooltip] = useState<{ date: string; day: DayData } | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -100,19 +101,23 @@ export default function YearOverview({ refreshKey }: { refreshKey: number }) {
                   return (
                     <div
                       key={dateStr}
-                      className={`aspect-square flex items-center justify-center rounded text-[9px] font-medium leading-none
-                        ${colorClass || (isToday ? 'ring-1 ring-inset ring-blue-400 text-blue-600' : 'text-gray-400')}
+                      className={`relative aspect-square flex items-center justify-center rounded text-[9px] font-medium leading-none
+                        ${colorClass || (isToday ? 'ring-1 ring-inset ring-blue-400 text-blue-600' : 'text-gray-400 hover:bg-gray-100')}
                       `}
-                      title={
-                        dayData
-                          ? [
-                              dayData.mine ? 'You' : '',
-                              ...(dayData.friends ?? []),
-                            ].filter(Boolean).join(', ')
-                          : undefined
-                      }
+                      onMouseEnter={() => dayData && (dayData.mine || dayData.friendCount > 0) && setTooltip({ date: dateStr, day: dayData })}
+                      onMouseLeave={() => setTooltip(null)}
                     >
                       {day}
+                      {tooltip?.date === dateStr && (
+                        <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-1 bg-gray-900 text-white text-xs rounded-lg px-2 py-1.5 whitespace-nowrap shadow-xl">
+                          <div className="font-semibold mb-0.5">{dateStr}</div>
+                          {tooltip.day.mine && <div className="text-blue-300">✓ You're available</div>}
+                          {tooltip.day.friends.length > 0 && (
+                            <div className="text-green-300">{tooltip.day.friends.join(', ')}</div>
+                          )}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -122,7 +127,7 @@ export default function YearOverview({ refreshKey }: { refreshKey: number }) {
         })}
       </div>
 
-      {/* Legend — identical to monthly view */}
+      {/* Legend */}
       <div className="mt-6 flex flex-wrap gap-3 text-xs text-gray-500">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded bg-blue-200" />
@@ -134,7 +139,7 @@ export default function YearOverview({ refreshKey }: { refreshKey: number }) {
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded bg-green-400" />
-          <span>You + friends (darker = more)</span>
+          <span>You + friends are free</span>
         </div>
       </div>
     </div>
