@@ -112,8 +112,13 @@ export default function Calendar({ refreshKey }: { refreshKey: number }) {
                 {day}
               </span>
               {dayData?.friendCount > 0 && (
-                <span className="text-xs font-bold leading-none">
-                  {dayData.friendCount > 9 ? '9+' : dayData.friendCount}
+                <span className="flex flex-col items-center leading-none">
+                  <span className="text-xs font-bold">
+                    {dayData.friendCount > 9 ? '9+' : dayData.friendCount}
+                  </span>
+                  <span className="text-[9px] opacity-70">
+                    {dayData.friendCount === 1 ? 'friend' : 'friends'}
+                  </span>
                 </span>
               )}
               {dayData?.mine && dayData.friendCount === 0 && (
@@ -142,15 +147,15 @@ export default function Calendar({ refreshKey }: { refreshKey: number }) {
       <div className="mt-6 flex flex-wrap gap-3 text-xs text-gray-500">
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded bg-blue-200" />
-          <span>Only you</span>
+          <span>You're free, no friends yet</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded bg-orange-200" />
-          <span>Friends only</span>
+          <span>Friends free, you're not</span>
         </div>
         <div className="flex items-center gap-1.5">
           <div className="w-4 h-4 rounded bg-green-400" />
-          <span>You + friends (darker = more)</span>
+          <span>You + friends are free (darker = more friends)</span>
         </div>
       </div>
     </div>

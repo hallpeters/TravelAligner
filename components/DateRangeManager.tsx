@@ -120,7 +120,7 @@ export default function DateRangeManager({ onRefresh }: { onRefresh: () => void 
               type="date"
               value={startDate}
               onChange={e => setStartDate(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500"
             />
           </div>
           <div>
@@ -130,7 +130,7 @@ export default function DateRangeManager({ onRefresh }: { onRefresh: () => void 
               value={endDate}
               min={startDate}
               onChange={e => setEndDate(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500"
             />
           </div>
         </div>
@@ -139,7 +139,7 @@ export default function DateRangeManager({ onRefresh }: { onRefresh: () => void 
           placeholder="Label (optional, e.g. Summer trip)"
           value={label}
           onChange={e => setLabel(e.target.value)}
-          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500"
         />
         {error && <p className="text-red-500 text-xs">{error}</p>}
         <button
@@ -166,7 +166,7 @@ export default function DateRangeManager({ onRefresh }: { onRefresh: () => void 
                       type="date"
                       value={editStart}
                       onChange={e => setEditStart(e.target.value)}
-                      className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-500"
                     />
                   </div>
                   <div>
@@ -176,7 +176,7 @@ export default function DateRangeManager({ onRefresh }: { onRefresh: () => void 
                       value={editEnd}
                       min={editStart}
                       onChange={e => setEditEnd(e.target.value)}
-                      className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                      className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-500"
                     />
                   </div>
                 </div>
@@ -185,7 +185,7 @@ export default function DateRangeManager({ onRefresh }: { onRefresh: () => void 
                   placeholder="Label (optional)"
                   value={editLabel}
                   onChange={e => setEditLabel(e.target.value)}
-                  className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="w-full border border-blue-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-500"
                 />
                 {editError && <p className="text-red-500 text-xs">{editError}</p>}
                 <div className="flex gap-2">
