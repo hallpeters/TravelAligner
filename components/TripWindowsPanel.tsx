@@ -523,7 +523,7 @@ export default function TripWindowsPanel({
       ) : (
         <button onClick={() => setShowForm(true)}
           className="w-full mb-5 py-1.5 text-sm text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-400 rounded-lg transition-colors">
-          + Add date range
+          + Add date availability
         </button>
       )}
 
