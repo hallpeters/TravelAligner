@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Calendar from '@/components/Calendar';
 import TripWindowsPanel from '@/components/TripWindowsPanel';
@@ -12,8 +12,19 @@ export default function Dashboard() {
   const [calendarKey, setCalendarKey] = useState(0);
   const [tab, setTab] = useState<'calendar' | 'friends'>('calendar');
   const [calView, setCalView] = useState<'month' | 'year'>('month');
+  const [pendingRequests, setPendingRequests] = useState(0);
 
   const refreshCalendar = useCallback(() => setCalendarKey(k => k + 1), []);
+
+  async function fetchPendingRequests() {
+    const res = await fetch('/api/friends');
+    if (res.ok) {
+      const data = await res.json();
+      setPendingRequests(data.incoming?.length ?? 0);
+    }
+  }
+
+  useEffect(() => { fetchPendingRequests(); }, []);
 
   async function logout() {
     await fetch('/api/auth/login', { method: 'DELETE' });
@@ -40,11 +51,16 @@ export default function Dashboard() {
             </button>
             <button
               onClick={() => setTab('friends')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`relative px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 tab === 'friends' ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               Friends
+              {pendingRequests > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {pendingRequests}
+                </span>
+              )}
             </button>
           </nav>
           <button
@@ -99,7 +115,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="max-w-md mx-auto">
-            <FriendsManager />
+            <FriendsManager onRequestsChange={fetchPendingRequests} />
           </div>
         )}
       </main>

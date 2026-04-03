@@ -10,7 +10,7 @@ type FriendsData = {
   outgoing: User[];
 };
 
-export default function FriendsManager() {
+export default function FriendsManager({ onRequestsChange }: { onRequestsChange?: () => void }) {
   const [data, setData] = useState<FriendsData>({ friends: [], incoming: [], outgoing: [] });
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
@@ -26,7 +26,10 @@ export default function FriendsManager() {
 
   async function fetchFriends() {
     const res = await fetch('/api/friends');
-    if (res.ok) setData(await res.json());
+    if (res.ok) {
+      setData(await res.json());
+      onRequestsChange?.();
+    }
   }
 
   useEffect(() => { fetchFriends(); }, []);
