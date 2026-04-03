@@ -366,9 +366,11 @@ const STORAGE_KEY = 'tripWindowLabels';
 export default function TripWindowsPanel({
   refreshKey,
   onRefresh,
+  onGoToFriends,
 }: {
   refreshKey: number;
   onRefresh: () => void;
+  onGoToFriends?: () => void;
 }) {
   const [myRanges, setMyRanges] = useState<MyRange[]>([]);
   const [friendRanges, setFriendRanges] = useState<FriendRange[]>([]);
@@ -522,6 +524,19 @@ export default function TripWindowsPanel({
           className="w-full mb-5 py-1.5 text-sm text-blue-600 hover:text-blue-700 border border-dashed border-blue-300 hover:border-blue-400 rounded-lg transition-colors">
           + Add date range
         </button>
+      )}
+
+      {/* Invite prompt: has dates but no friends yet */}
+      {!loading && myRanges.length > 0 && friendRanges.length === 0 && (
+        <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-center">
+          <p className="text-sm text-blue-800 font-medium mb-2">Now invite a friend to see when you can travel together</p>
+          <button
+            onClick={onGoToFriends}
+            className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-lg transition-colors"
+          >
+            Go to Friends
+          </button>
+        </div>
       )}
 
       {loading ? (

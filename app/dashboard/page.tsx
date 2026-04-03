@@ -86,14 +86,14 @@ export default function Dashboard() {
                 <div className="sticky top-20">
                   <Calendar refreshKey={calendarKey} />
                 </div>
-                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} />
+                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div className="sticky top-20">
                   <YearOverview refreshKey={calendarKey} />
                 </div>
-                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} />
+                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
               </div>
             )}
           </div>
