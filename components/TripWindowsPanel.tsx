@@ -260,8 +260,8 @@ function WindowCard({
 
   const badgeText = {
     grey: 'Your dates',
-    green: "You're free!",
-    yellow: 'Not free',
+    green: 'Potential trip!',
+    yellow: "Friends free - you're not",
   }[w.type];
 
   return (
@@ -483,10 +483,10 @@ export default function TripWindowsPanel({
           <span className="inline-block w-2 h-2 rounded-sm bg-gray-400" /> Your dates
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-sm bg-green-500" /> You + friends
+          <span className="inline-block w-2 h-2 rounded-sm bg-green-500" /> Potential trip
         </span>
         <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-sm bg-orange-400" /> Friends only
+          <span className="inline-block w-2 h-2 rounded-sm bg-orange-400" /> Friends free - you're not
         </span>
       </div>
 
