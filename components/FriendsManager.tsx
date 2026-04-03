@@ -15,6 +15,14 @@ export default function FriendsManager() {
   const [search, setSearch] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  function copyInviteLink() {
+    navigator.clipboard.writeText(window.location.origin).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
 
   async function fetchFriends() {
     const res = await fetch('/api/friends');
@@ -81,6 +89,17 @@ export default function FriendsManager() {
       </form>
       {message && <p className="text-green-600 text-xs mb-3">{message}</p>}
       {error && <p className="text-red-500 text-xs mb-3">{error}</p>}
+
+      {/* Invite prompt */}
+      <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 mb-6">
+        <p className="text-xs text-gray-500">Friend not on TravelSync yet?</p>
+        <button
+          onClick={copyInviteLink}
+          className="text-xs font-medium text-blue-600 hover:text-blue-700 transition-colors whitespace-nowrap ml-3"
+        >
+          {copied ? 'Copied!' : 'Copy invite link'}
+        </button>
+      </div>
 
       {/* Incoming requests */}
       {data.incoming.length > 0 && (
