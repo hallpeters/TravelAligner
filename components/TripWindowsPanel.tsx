@@ -154,6 +154,7 @@ function generateWindows(
     start_date: r.start_date,
     end_date: r.end_date,
     label: r.label,
+    rangeId: r.id,
     friends: [
       ...new Set(
         friendRanges
@@ -201,15 +202,21 @@ function WindowCard({
   onToggle,
   labelOverride,
   onLabelSave,
+  onDateRangeSave,
 }: {
   window: TripWindow;
   expanded: boolean;
   onToggle: () => void;
   labelOverride: string | null;
   onLabelSave: (label: string) => void;
+  onDateRangeSave?: (id: number, start: string, end: string, label: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
+  const [editStart, setEditStart] = useState('');
+  const [editEnd, setEditEnd] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   const visibleFriends = expanded ? w.friends : w.friends.slice(0, SHOW_LIMIT);
   const days = dayCount(w.start_date, w.end_date);
@@ -219,11 +226,23 @@ function WindowCard({
 
   function startEdit() {
     setDraft(displayLabel ?? '');
+    setEditStart(w.start_date);
+    setEditEnd(w.end_date);
+    setEditError('');
     setEditing(true);
   }
 
   function save() {
     onLabelSave(draft.trim());
+    setEditing(false);
+  }
+
+  async function saveGreyEdit() {
+    if (!editStart || !editEnd) { setEditError('Both dates required'); return; }
+    if (editStart > editEnd) { setEditError('Start must be before end'); return; }
+    setSaving(true);
+    await onDateRangeSave!(w.rangeId!, editStart, editEnd, draft.trim());
+    setSaving(false);
     setEditing(false);
   }
 
@@ -265,8 +284,37 @@ function WindowCard({
         </button>
       )}
 
-      {/* Name (only shown when set or editing) */}
-      {editing ? (
+      {/* Edit form */}
+      {editing && w.type === 'grey' ? (
+        <div className="mb-2 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs font-medium text-gray-500 mb-1 block">From</label>
+              <input autoFocus type="date" value={editStart} onChange={e => setEditStart(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 mb-1 block">To</label>
+              <input type="date" value={editEnd} min={editStart} onChange={e => setEditEnd(e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            </div>
+          </div>
+          <input type="text" placeholder="Label (optional)" value={draft} onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') saveGreyEdit(); if (e.key === 'Escape') setEditing(false); }}
+            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          {editError && <p className="text-red-500 text-xs">{editError}</p>}
+          <div className="flex gap-2">
+            <button onClick={saveGreyEdit} disabled={saving}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 rounded-lg transition-colors disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={() => setEditing(false)}
+              className="flex-1 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium py-1.5 rounded-lg border border-gray-200 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : editing ? (
         <div className="mb-1">
           <input
             autoFocus
@@ -282,7 +330,7 @@ function WindowCard({
         <div className="text-sm font-semibold text-gray-900 leading-tight mb-0.5">{displayLabel}</div>
       ) : null}
 
-      <div className="text-sm font-medium text-gray-700">{formatRange(w.start_date, w.end_date)}</div>
+      {!editing && <div className="text-sm font-medium text-gray-700">{formatRange(w.start_date, w.end_date)}</div>}
 
       {/* Stats */}
       <div className="mt-2 flex gap-3 text-xs text-gray-600">
@@ -401,6 +449,15 @@ export default function TripWindowsPanel({
     });
   }
 
+  async function saveDateRange(id: number, start: string, end: string, label: string) {
+    await fetch('/api/date-ranges', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, start_date: start, end_date: end, label: label || null }),
+    });
+    onRefresh();
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       {/* Header + filter */}
@@ -483,6 +540,7 @@ export default function TripWindowsPanel({
               onToggle={() => toggleExpanded(w.id)}
               labelOverride={labelOverrides[w.id] ?? null}
               onLabelSave={label => saveLabel(w.id, label)}
+              onDateRangeSave={saveDateRange}
             />
           ))}
         </div>
