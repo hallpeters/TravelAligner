@@ -464,7 +464,7 @@ export default function TripWindowsPanel({
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       {/* Header + filter */}
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Trip Windows</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Potential Trips</h2>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500 whitespace-nowrap">Min days</label>
           <input
