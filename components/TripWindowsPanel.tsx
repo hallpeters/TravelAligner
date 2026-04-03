@@ -291,17 +291,17 @@ function WindowCard({
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1 block">From</label>
               <input autoFocus type="date" value={editStart} onChange={e => setEditStart(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1 block">To</label>
               <input type="date" value={editEnd} min={editStart} onChange={e => setEditEnd(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+                className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
             </div>
           </div>
           <input type="text" placeholder="Label (optional)" value={draft} onChange={e => setDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') saveGreyEdit(); if (e.key === 'Escape') setEditing(false); }}
-            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-400" />
           {editError && <p className="text-red-500 text-xs">{editError}</p>}
           <div className="flex gap-2">
             <button onClick={saveGreyEdit} disabled={saving}
@@ -472,7 +472,7 @@ export default function TripWindowsPanel({
             min={1}
             value={minDays}
             onChange={e => setMinDays(Math.max(1, parseInt(e.target.value) || 1))}
-            className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-center text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>
@@ -497,16 +497,16 @@ export default function TripWindowsPanel({
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1 block">From</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500" />
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400" />
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1 block">To</label>
               <input type="date" value={endDate} min={startDate} onChange={e => setEndDate(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500" />
+                className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400" />
             </div>
           </div>
           <input type="text" placeholder="Label (optional)" value={rangeLabel} onChange={e => setRangeLabel(e.target.value)}
-            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500" />
+            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400" />
           <p className="text-[11px] text-gray-400">Add dates you're free to travel — not trips you've already booked.</p>
           {formError && <p className="text-red-500 text-xs">{formError}</p>}
           <div className="flex gap-2">
