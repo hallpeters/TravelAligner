@@ -507,6 +507,7 @@ export default function TripWindowsPanel({
           </div>
           <input type="text" placeholder="Label (optional)" value={rangeLabel} onChange={e => setRangeLabel(e.target.value)}
             className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-500" />
+          <p className="text-[11px] text-gray-400">Add dates you're free to travel — not trips you've already booked.</p>
           {formError && <p className="text-red-500 text-xs">{formError}</p>}
           <div className="flex gap-2">
             <button type="submit" disabled={formLoading}
