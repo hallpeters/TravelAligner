@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 type DayData = {
   mine: boolean;
@@ -27,13 +27,50 @@ function friendCountColor(count: number, mine: boolean): string {
   return '';
 }
 
-export default function Calendar({ refreshKey }: { refreshKey: number }) {
+export default function Calendar({
+  refreshKey,
+  onDateSelected,
+}: {
+  refreshKey: number;
+  onDateSelected?: (start: string, end: string) => void;
+}) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [data, setData] = useState<CalendarData>({});
   const [tooltip, setTooltip] = useState<{ date: string; day: DayData } | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Drag selection — isDragging is a ref to avoid re-renders during drag
+  const isDragging = useRef(false);
+  const dragStartRef = useRef<string | null>(null);
+  const dragEndRef = useRef<string | null>(null);
+  const onDateSelectedRef = useRef(onDateSelected);
+  const [dragStart, setDragStart] = useState<string | null>(null);
+  const [dragEnd, setDragEnd] = useState<string | null>(null);
+
+  useEffect(() => { onDateSelectedRef.current = onDateSelected; }, [onDateSelected]);
+
+  const finalizeDrag = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const s = dragStartRef.current;
+    const e = dragEndRef.current;
+    dragStartRef.current = null;
+    dragEndRef.current = null;
+    setDragStart(null);
+    setDragEnd(null);
+    if (s && e) {
+      const start = s <= e ? s : e;
+      const end = s <= e ? e : s;
+      onDateSelectedRef.current?.(start, end);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener('mouseup', finalizeDrag);
+    return () => window.removeEventListener('mouseup', finalizeDrag);
+  }, [finalizeDrag]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -60,8 +97,11 @@ export default function Calendar({ refreshKey }: { refreshKey: number }) {
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
-  // Pad to complete weeks
   while (cells.length % 7 !== 0) cells.push(null);
+
+  // Normalized drag range for highlight check
+  const dragRangeStart = dragStart && dragEnd ? (dragStart <= dragEnd ? dragStart : dragEnd) : null;
+  const dragRangeEnd = dragStart && dragEnd ? (dragStart <= dragEnd ? dragEnd : dragStart) : null;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -89,26 +129,48 @@ export default function Calendar({ refreshKey }: { refreshKey: number }) {
         ))}
       </div>
 
-      {/* Days grid */}
-      <div className={`grid grid-cols-7 gap-1 relative ${loading ? 'opacity-50' : ''}`}>
+      {/* Days grid — select-none prevents text highlighting during drag */}
+      <div className={`grid grid-cols-7 gap-1 relative select-none ${loading ? 'opacity-50' : ''}`}>
         {cells.map((day, i) => {
           if (!day) return <div key={i} />;
           const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const dayData = data[dateStr];
           const isToday = dateStr === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
           const colorClass = dayData ? friendCountColor(dayData.friendCount, dayData.mine) : '';
+          const inDragRange = !!(dragRangeStart && dragRangeEnd && dateStr >= dragRangeStart && dateStr <= dragRangeEnd);
 
           return (
             <div
               key={dateStr}
-              className={`relative aspect-square flex flex-col items-center justify-center rounded-xl cursor-pointer transition-all hover:scale-105 hover:shadow-sm
-                ${colorClass || 'hover:bg-gray-50'}
-                ${isToday && !colorClass ? 'ring-2 ring-blue-400' : ''}
+              className={`relative aspect-square flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors
+                ${inDragRange
+                  ? 'bg-blue-100 ring-1 ring-blue-300'
+                  : `${colorClass || 'hover:bg-gray-50'} hover:scale-105 hover:shadow-sm`
+                }
+                ${isToday && !colorClass && !inDragRange ? 'ring-2 ring-blue-400' : ''}
               `}
-              onMouseEnter={() => dayData && (dayData.mine || dayData.friendCount > 0) && setTooltip({ date: dateStr, day: dayData })}
+              onMouseDown={() => {
+                isDragging.current = true;
+                dragStartRef.current = dateStr;
+                dragEndRef.current = dateStr;
+                setDragStart(dateStr);
+                setDragEnd(dateStr);
+                setTooltip(null);
+              }}
+              onMouseOver={() => {
+                if (!isDragging.current) return;
+                dragEndRef.current = dateStr;
+                setDragEnd(dateStr);
+              }}
+              onMouseEnter={() => {
+                if (isDragging.current) return;
+                if (dayData && (dayData.mine || dayData.friendCount > 0)) {
+                  setTooltip({ date: dateStr, day: dayData });
+                }
+              }}
               onMouseLeave={() => setTooltip(null)}
             >
-              <span className={`text-sm font-medium ${isToday && !colorClass ? 'text-blue-600' : ''}`}>
+              <span className={`text-sm font-medium ${isToday && !colorClass && !inDragRange ? 'text-blue-600' : ''}`}>
                 {day}
               </span>
               {dayData?.friendCount > 0 && (
@@ -125,8 +187,8 @@ export default function Calendar({ refreshKey }: { refreshKey: number }) {
                 <div className="w-1 h-1 rounded-full bg-blue-400 mt-0.5" />
               )}
 
-              {/* Tooltip */}
-              {tooltip?.date === dateStr && (
+              {/* Tooltip — suppressed while dragging */}
+              {!isDragging.current && tooltip?.date === dateStr && (
                 <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
                   <div className="font-semibold mb-1">{dateStr}</div>
                   {tooltip.day.mine && <div className="text-blue-300">✓ You're available</div>}
