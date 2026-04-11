@@ -48,7 +48,10 @@ export default function YearOverview({ refreshKey, headerRight }: { refreshKey: 
 
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-100 p-6 ${loading ? 'opacity-60' : ''}`}>
-      {/* Header */}
+      {/* View toggle row */}
+      {headerRight && <div className="flex justify-end mb-3">{headerRight}</div>}
+
+      {/* Year nav */}
       <div className="flex items-center justify-between mb-6">
         <button
           onClick={() => setYear(y => y - 1)}
@@ -59,17 +62,14 @@ export default function YearOverview({ refreshKey, headerRight }: { refreshKey: 
           </svg>
         </button>
         <h2 className="text-xl font-semibold text-gray-900">{year}</h2>
-        <div className="flex items-center gap-2">
-          {headerRight}
-          <button
-            onClick={() => setYear(y => y + 1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+        <button
+          onClick={() => setYear(y => y + 1)}
+          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
       </div>
 
       {/* 12 mini months */}
