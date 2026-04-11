@@ -41,36 +41,26 @@ export default function Calendar({
   const [tooltip, setTooltip] = useState<{ date: string; day: DayData } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Drag selection — isDragging is a ref to avoid re-renders during drag
-  const isDragging = useRef(false);
-  const dragStartRef = useRef<string | null>(null);
-  const dragEndRef = useRef<string | null>(null);
-  const onDateSelectedRef = useRef(onDateSelected);
-  const [dragStart, setDragStart] = useState<string | null>(null);
-  const [dragEnd, setDragEnd] = useState<string | null>(null);
+  // Two-click selection state
+  const [selectionStart, setSelectionStart] = useState<string | null>(null);
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
 
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const onDateSelectedRef = useRef(onDateSelected);
   useEffect(() => { onDateSelectedRef.current = onDateSelected; }, [onDateSelected]);
 
-  const finalizeDrag = useCallback(() => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    const s = dragStartRef.current;
-    const e = dragEndRef.current;
-    dragStartRef.current = null;
-    dragEndRef.current = null;
-    setDragStart(null);
-    setDragEnd(null);
-    if (s && e) {
-      const start = s <= e ? s : e;
-      const end = s <= e ? e : s;
-      onDateSelectedRef.current?.(start, end);
-    }
-  }, []);
-
+  // Clicking outside the calendar cancels the pending first-click
   useEffect(() => {
-    window.addEventListener('mouseup', finalizeDrag);
-    return () => window.removeEventListener('mouseup', finalizeDrag);
-  }, [finalizeDrag]);
+    if (!selectionStart) return;
+    function handleOutsideClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setSelectionStart(null);
+        setHoverDate(null);
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [selectionStart]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -81,9 +71,6 @@ export default function Calendar({
 
   useEffect(() => { fetchData(); }, [fetchData, refreshKey]);
 
-  const firstDay = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-
   function prevMonth() {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
     else setMonth(m => m - 1);
@@ -93,18 +80,42 @@ export default function Calendar({
     else setMonth(m => m + 1);
   }
 
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+
   const cells: (number | null)[] = [
     ...Array(firstDay).fill(null),
     ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Normalized drag range for highlight check
-  const dragRangeStart = dragStart && dragEnd ? (dragStart <= dragEnd ? dragStart : dragEnd) : null;
-  const dragRangeEnd = dragStart && dragEnd ? (dragStart <= dragEnd ? dragEnd : dragStart) : null;
+  // Compute highlighted range
+  const previewEnd = selectionStart ? (hoverDate ?? selectionStart) : null;
+  const rangeStart = selectionStart && previewEnd
+    ? (selectionStart <= previewEnd ? selectionStart : previewEnd)
+    : null;
+  const rangeEnd = selectionStart && previewEnd
+    ? (selectionStart <= previewEnd ? previewEnd : selectionStart)
+    : null;
+
+  function handleDayClick(dateStr: string) {
+    if (!selectionStart) {
+      // First click — begin selection
+      setSelectionStart(dateStr);
+      setHoverDate(dateStr);
+      setTooltip(null);
+    } else {
+      // Second click — confirm range
+      const start = selectionStart <= dateStr ? selectionStart : dateStr;
+      const end = selectionStart <= dateStr ? dateStr : selectionStart;
+      setSelectionStart(null);
+      setHoverDate(null);
+      onDateSelectedRef.current?.(start, end);
+    }
+  }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+    <div ref={wrapperRef} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -122,6 +133,13 @@ export default function Calendar({
         </button>
       </div>
 
+      {/* Hint text while awaiting second click */}
+      {selectionStart && (
+        <p className="text-xs text-center text-blue-500 mb-2 -mt-3">
+          Click a second date to complete your range
+        </p>
+      )}
+
       {/* Day names */}
       <div className="grid grid-cols-7 mb-2">
         {DAYS.map(d => (
@@ -129,7 +147,7 @@ export default function Calendar({
         ))}
       </div>
 
-      {/* Days grid — select-none prevents text highlighting during drag */}
+      {/* Days grid */}
       <div className={`grid grid-cols-7 gap-1 relative select-none ${loading ? 'opacity-50' : ''}`}>
         {cells.map((day, i) => {
           if (!day) return <div key={i} />;
@@ -137,43 +155,44 @@ export default function Calendar({
           const dayData = data[dateStr];
           const isToday = dateStr === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
           const colorClass = dayData ? friendCountColor(dayData.friendCount, dayData.mine) : '';
-          const inDragRange = !!(dragRangeStart && dragRangeEnd && dateStr >= dragRangeStart && dateStr <= dragRangeEnd);
+          const inRange = !!(rangeStart && rangeEnd && dateStr >= rangeStart && dateStr <= rangeEnd);
+          const isAnchor = dateStr === selectionStart;
 
           return (
             <div
               key={dateStr}
               className={`relative aspect-square flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors
-                ${inDragRange
-                  ? 'bg-blue-100 ring-1 ring-blue-300'
+                ${inRange
+                  ? isAnchor
+                    ? 'bg-blue-500 text-white ring-2 ring-blue-600'
+                    : 'bg-blue-100 ring-1 ring-blue-300'
                   : `${colorClass || 'hover:bg-gray-50'} hover:scale-105 hover:shadow-sm`
                 }
-                ${isToday && !colorClass && !inDragRange ? 'ring-2 ring-blue-400' : ''}
+                ${isToday && !colorClass && !inRange ? 'ring-2 ring-blue-400' : ''}
               `}
-              onMouseDown={() => {
-                isDragging.current = true;
-                dragStartRef.current = dateStr;
-                dragEndRef.current = dateStr;
-                setDragStart(dateStr);
-                setDragEnd(dateStr);
-                setTooltip(null);
-              }}
-              onMouseOver={() => {
-                if (!isDragging.current) return;
-                dragEndRef.current = dateStr;
-                setDragEnd(dateStr);
-              }}
+              onClick={() => handleDayClick(dateStr)}
               onMouseEnter={() => {
-                if (isDragging.current) return;
-                if (dayData && (dayData.mine || dayData.friendCount > 0)) {
+                if (selectionStart) {
+                  setHoverDate(dateStr);
+                } else if (dayData && (dayData.mine || dayData.friendCount > 0)) {
                   setTooltip({ date: dateStr, day: dayData });
                 }
               }}
-              onMouseLeave={() => setTooltip(null)}
+              onMouseLeave={() => {
+                if (selectionStart) {
+                  setHoverDate(selectionStart);
+                } else {
+                  setTooltip(null);
+                }
+              }}
             >
-              <span className={`text-sm font-medium ${isToday && !colorClass && !inDragRange ? 'text-blue-600' : ''}`}>
+              <span className={`text-sm font-medium
+                ${isAnchor ? 'text-white' : ''}
+                ${isToday && !colorClass && !inRange ? 'text-blue-600' : ''}
+              `}>
                 {day}
               </span>
-              {dayData?.friendCount > 0 && (
+              {!inRange && dayData?.friendCount > 0 && (
                 <span className="flex flex-col items-center leading-none">
                   <span className="text-xs font-bold">
                     {dayData.friendCount > 9 ? '9+' : dayData.friendCount}
@@ -183,12 +202,12 @@ export default function Calendar({
                   </span>
                 </span>
               )}
-              {dayData?.mine && dayData.friendCount === 0 && (
+              {!inRange && dayData?.mine && dayData.friendCount === 0 && (
                 <div className="w-1 h-1 rounded-full bg-blue-400 mt-0.5" />
               )}
 
-              {/* Tooltip — suppressed while dragging */}
-              {!isDragging.current && tooltip?.date === dateStr && (
+              {/* Tooltip — only when not in selection mode */}
+              {!selectionStart && tooltip?.date === dateStr && (
                 <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
                   <div className="font-semibold mb-1">{dateStr}</div>
                   {tooltip.day.mine && <div className="text-blue-300">✓ You're available</div>}
