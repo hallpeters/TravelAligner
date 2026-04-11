@@ -91,6 +91,13 @@ function selectNonOverlapping(
 
 // ---- route handler ----
 
+type WindowMeta = {
+  topContinents: { continent: string; count: number }[];
+  price_usd: number | null;
+  destination_iata: string | null;
+  flightContinent: string | null;
+};
+
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -110,7 +117,7 @@ export async function GET() {
   `, [session.userId])).rows as { id: number; username: string }[];
 
   if (friends.length === 0) {
-    return NextResponse.json({ myRanges, friendRanges: [], windowPrices: {} });
+    return NextResponse.json({ myRanges, friendRanges: [], windowMeta: {} });
   }
 
   const friendIds = friends.map(f => f.id);
@@ -127,32 +134,83 @@ export async function GET() {
     end_date: r.end_date,
   }));
 
-  // Compute actionable windows to determine which ones get price lookups
+  // Fetch current user's home_airport
+  const userRow = (await query(
+    'SELECT home_airport FROM users WHERE id = $1',
+    [session.userId]
+  )).rows[0] as { home_airport: string | null } | undefined;
+  const userHomeAirport = userRow?.home_airport ?? null;
+
+  // Fetch all friends' continents and home_airport in one query
+  const friendDataRows = (await query(
+    'SELECT id, continents, home_airport FROM users WHERE id = ANY($1)',
+    [friendIds]
+  )).rows as { id: number; continents: string[] | null; home_airport: string | null }[];
+
+  const nameToData = new Map<string, { continents: string[]; home_airport: string | null }>();
+  for (const fr of friendDataRows) {
+    const username = idToName.get(fr.id);
+    if (username) {
+      nameToData.set(username, { continents: fr.continents ?? [], home_airport: fr.home_airport });
+    }
+  }
+
+  // Compute actionable windows
   const segments = computeSegments(myRanges, friendRanges);
   const spans = enumerateSpans(segments);
   const greenWindows = selectNonOverlapping(spans.filter(s => s.meInAll));
   const yellowWindows = selectNonOverlapping(spans.filter(s => !s.meInAll));
 
-  // Top 5 by friend count across green + yellow
+  // Build windowMeta for all green+yellow windows
+  const windowMeta: Record<string, WindowMeta> = {};
+  for (const w of [...greenWindows, ...yellowWindows]) {
+    const key = `${w.start}/${w.end}`;
+    const continentCounts: Record<string, number> = {};
+    for (const fname of w.friends) {
+      for (const c of nameToData.get(fname)?.continents ?? []) {
+        continentCounts[c] = (continentCounts[c] ?? 0) + 1;
+      }
+    }
+    const topContinents = Object.entries(continentCounts)
+      .map(([continent, count]) => ({ continent, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    windowMeta[key] = { topContinents, price_usd: null, destination_iata: null, flightContinent: null };
+  }
+
+  // Fetch flight prices for top 5 windows by friend count
   const top5 = [...greenWindows, ...yellowWindows]
     .sort((a, b) => b.friends.length - a.friends.length)
     .slice(0, 5);
 
-  // Fetch prices in parallel
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  const windowPrices: Record<string, number | null> = {};
 
   await Promise.all(
     top5.map(async (w) => {
+      const key = `${w.start}/${w.end}`;
+      const meta = windowMeta[key];
+      if (!meta || meta.topContinents.length === 0 || !userHomeAirport) return;
+
+      const topContinent = meta.topContinents[0].continent;
+      const friendHomeAirports = w.friends
+        .map(fname => nameToData.get(fname)?.home_airport)
+        .filter((a): a is string => !!a);
+      const exclude = [...new Set(friendHomeAirports)].join(',');
+
       try {
-        const res = await fetch(`${appUrl}/api/flights?start=${w.start}&end=${w.end}`);
+        const res = await fetch(
+          `${appUrl}/api/flights?continent=${encodeURIComponent(topContinent)}&origin=${encodeURIComponent(userHomeAirport)}&exclude=${encodeURIComponent(exclude)}`
+        );
         const data = await res.json();
-        windowPrices[`${w.start}/${w.end}`] = typeof data.price_usd === 'number' ? data.price_usd : null;
+        meta.price_usd = typeof data.price_usd === 'number' ? data.price_usd : null;
+        meta.destination_iata = data.destination_iata ?? null;
+        meta.flightContinent = topContinent;
       } catch {
-        windowPrices[`${w.start}/${w.end}`] = null;
+        // leave as null
       }
     })
   );
 
-  return NextResponse.json({ myRanges, friendRanges, windowPrices });
+  return NextResponse.json({ myRanges, friendRanges, windowMeta });
 }

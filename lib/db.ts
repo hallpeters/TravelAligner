@@ -34,10 +34,21 @@ async function initDb() {
       created_at TEXT DEFAULT NOW()::TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
+
+    CREATE TABLE IF NOT EXISTS flight_cache (
+      id SERIAL PRIMARY KEY,
+      origin_iata TEXT NOT NULL,
+      destination_iata TEXT NOT NULL,
+      price_usd INTEGER,
+      provider TEXT,
+      fetched_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(origin_iata, destination_iata)
+    );
   `);
 }
 
 // Add continents column to existing databases that predate this migration
 pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS continents TEXT[] DEFAULT '{}'`).catch(console.error);
+pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS home_airport TEXT`).catch(console.error);
 
 initDb().catch(console.error);

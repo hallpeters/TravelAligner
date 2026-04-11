@@ -13,7 +13,27 @@ type TripWindow = {
   label: string | null;
   friends: string[];
   rangeId?: number; // only set for grey cards (DB id)
-  price_usd?: number | null;
+  price_usd: number | null;
+  topContinents: { continent: string; count: number }[];
+  destination_iata: string | null;
+  flightContinent: string | null;
+};
+
+type WindowMeta = {
+  topContinents: { continent: string; count: number }[];
+  price_usd: number | null;
+  destination_iata: string | null;
+  flightContinent: string | null;
+};
+
+const CONTINENT_EMOJI: Record<string, string> = {
+  Africa: '🌍',
+  Asia: '🌏',
+  Europe: '🌍',
+  'North America': '🌎',
+  'South America': '🌎',
+  Oceania: '🌏',
+  Antarctica: '🧊',
 };
 
 // ---- date helpers ----
@@ -138,6 +158,10 @@ function selectNonOverlapping(
       end_date: c.end,
       label,
       friends: c.friends,
+      price_usd: null,
+      topContinents: [],
+      destination_iata: null,
+      flightContinent: null,
     });
   }
   return selected;
@@ -147,7 +171,7 @@ function generateWindows(
   myRanges: MyRange[],
   friendRanges: FriendRange[],
   minDays: number,
-  windowPrices: Record<string, number | null> = {}
+  windowMeta: Record<string, WindowMeta> = {}
 ): TripWindow[] {
   // Grey cards: one per personal range, friends = those who cover the FULL range
   const grey: TripWindow[] = myRanges.map(r => ({
@@ -157,6 +181,10 @@ function generateWindows(
     end_date: r.end_date,
     label: r.label,
     rangeId: r.id,
+    price_usd: null,
+    topContinents: [],
+    destination_iata: null,
+    flightContinent: null,
     friends: [
       ...new Set(
         friendRanges
@@ -180,11 +208,18 @@ function generateWindows(
     'yellow', minDays, myRanges
   );
 
-  // Assign prices from server-fetched windowPrices map (green + yellow only)
+  // Attach server-fetched meta (topContinents, price, destination) to green + yellow
   const allWindows = [...grey, ...green, ...yellow].map(w => {
     if (w.type === 'grey') return w;
     const key = `${w.start_date}/${w.end_date}`;
-    return { ...w, price_usd: key in windowPrices ? windowPrices[key] : null };
+    const meta = windowMeta[key];
+    return {
+      ...w,
+      price_usd: meta?.price_usd ?? null,
+      topContinents: meta?.topContinents ?? [],
+      destination_iata: meta?.destination_iata ?? null,
+      flightContinent: meta?.flightContinent ?? null,
+    };
   });
 
   // Sort by: total people DESC → user-attending first → price ASC (null last) → duration DESC
@@ -363,8 +398,17 @@ function WindowCard({
         <span>·</span>
         <span>{days} {days === 1 ? 'day' : 'days'}</span>
       </div>
-      {(w.type === 'green' || w.type === 'yellow') && w.price_usd != null && (
-        <div className="mt-1 text-xs text-gray-400">~${w.price_usd} cheapest flight</div>
+      {(w.type === 'green' || w.type === 'yellow') && w.topContinents.length > 0 && (
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          {w.topContinents.map(({ continent, count }) => (
+            <span key={continent} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+              {CONTINENT_EMOJI[continent] ?? '🌍'} {continent} · {count}
+            </span>
+          ))}
+        </div>
+      )}
+      {(w.type === 'green' || w.type === 'yellow') && w.price_usd != null && w.destination_iata && (
+        <div className="mt-1 text-xs text-gray-400">~${w.price_usd} to {w.destination_iata} ({w.flightContinent})</div>
       )}
 
       {/* Friend list */}
@@ -442,7 +486,7 @@ export default function TripWindowsPanel({
 }) {
   const [myRanges, setMyRanges] = useState<MyRange[]>([]);
   const [friendRanges, setFriendRanges] = useState<FriendRange[]>([]);
-  const [windowPrices, setWindowPrices] = useState<Record<string, number | null>>({});
+  const [windowMeta, setWindowMeta] = useState<Record<string, WindowMeta>>({});
   const [minDays, setMinDays] = useState(1);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({});
@@ -470,7 +514,7 @@ export default function TripWindowsPanel({
       .then(data => {
         setMyRanges(data.myRanges ?? []);
         setFriendRanges(data.friendRanges ?? []);
-        setWindowPrices(data.windowPrices ?? {});
+        setWindowMeta(data.windowMeta ?? {});
         setLoading(false);
       });
   }, [refreshKey]);
@@ -510,8 +554,8 @@ export default function TripWindowsPanel({
   }
 
   const windows = useMemo(
-    () => generateWindows(myRanges, friendRanges, minDays, windowPrices),
-    [myRanges, friendRanges, minDays, windowPrices]
+    () => generateWindows(myRanges, friendRanges, minDays, windowMeta),
+    [myRanges, friendRanges, minDays, windowMeta]
   );
 
   function toggleExpanded(id: string) {
