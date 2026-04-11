@@ -7,6 +7,7 @@ import TripWindowsPanel from '@/components/TripWindowsPanel';
 import FriendsManager from '@/components/FriendsManager';
 import YearOverview from '@/components/YearOverview';
 import TravelPreferences from '@/components/TravelPreferences';
+import MobileDateSheet from '@/components/MobileDateSheet';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -125,6 +126,7 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      <MobileDateSheet onRefresh={refreshCalendar} />
     </div>
   );
 }

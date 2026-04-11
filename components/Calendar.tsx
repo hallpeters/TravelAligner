@@ -36,9 +36,13 @@ function formatShort(d: string) {
 export default function Calendar({
   refreshKey,
   onSaved,
+  readOnly,
+  onDaySelected,
 }: {
   refreshKey: number;
   onSaved?: () => void;
+  readOnly?: boolean;
+  onDaySelected?: (date: string) => void;
 }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -47,7 +51,7 @@ export default function Calendar({
   const [tooltip, setTooltip] = useState<{ date: string; day: DayData } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Two-click selection
+  // Two-click selection (desktop only — disabled when readOnly)
   const [selectionStart, setSelectionStart] = useState<string | null>(null);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [confirmedRange, setConfirmedRange] = useState<{ start: string; end: string } | null>(null);
@@ -87,7 +91,7 @@ export default function Calendar({
     return () => document.removeEventListener('mousedown', onOutside);
   }, [selectionStart]);
 
-  // Close popup when clicking outside it (but inside the calendar card)
+  // Close popup when clicking outside it
   useEffect(() => {
     if (!confirmedRange) return;
     function onOutside(e: MouseEvent) {
@@ -154,7 +158,7 @@ export default function Calendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Compute highlighted range
+  // Compute highlighted range (desktop selection only)
   const previewEnd = selectionStart ? (hoverDate ?? selectionStart) : null;
   const rangeStart = selectionStart && previewEnd
     ? (selectionStart <= previewEnd ? selectionStart : previewEnd)
@@ -164,7 +168,10 @@ export default function Calendar({
     : confirmedRange?.end ?? null;
 
   function handleDayClick(dateStr: string) {
-    // If popup is open, a day click starts a fresh selection
+    if (readOnly) {
+      onDaySelected?.(dateStr);
+      return;
+    }
     if (confirmedRange) {
       cancelPopup();
       setSelectionStart(dateStr);
@@ -208,8 +215,8 @@ export default function Calendar({
         </button>
       </div>
 
-      {/* Hint while awaiting second click */}
-      {selectionStart && (
+      {/* Hint while awaiting second click (desktop only) */}
+      {!readOnly && selectionStart && (
         <p className="text-xs text-center text-blue-500 mb-2 -mt-4">
           Click a second date to complete your range
         </p>
@@ -231,8 +238,8 @@ export default function Calendar({
             const dayData = data[dateStr];
             const isToday = dateStr === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             const colorClass = dayData ? friendCountColor(dayData.friendCount, dayData.mine) : '';
-            const inRange = !!(rangeStart && rangeEnd && dateStr >= rangeStart && dateStr <= rangeEnd);
-            const isAnchor = dateStr === selectionStart;
+            const inRange = !readOnly && !!(rangeStart && rangeEnd && dateStr >= rangeStart && dateStr <= rangeEnd);
+            const isAnchor = !readOnly && dateStr === selectionStart;
 
             return (
               <div
@@ -248,14 +255,14 @@ export default function Calendar({
                 `}
                 onClick={() => handleDayClick(dateStr)}
                 onMouseEnter={() => {
-                  if (selectionStart) {
+                  if (!readOnly && selectionStart) {
                     setHoverDate(dateStr);
-                  } else if (!confirmedRange && dayData && (dayData.mine || dayData.friendCount > 0)) {
+                  } else if (!readOnly && !confirmedRange && dayData && (dayData.mine || dayData.friendCount > 0)) {
                     setTooltip({ date: dateStr, day: dayData });
                   }
                 }}
                 onMouseLeave={() => {
-                  if (selectionStart) {
+                  if (!readOnly && selectionStart) {
                     setHoverDate(selectionStart);
                   } else {
                     setTooltip(null);
@@ -282,8 +289,8 @@ export default function Calendar({
                   <div className="w-1 h-1 rounded-full bg-blue-400 mt-0.5" />
                 )}
 
-                {/* Tooltip */}
-                {!selectionStart && !confirmedRange && tooltip?.date === dateStr && (
+                {/* Tooltip — desktop only, not in readOnly mode */}
+                {!readOnly && !selectionStart && !confirmedRange && tooltip?.date === dateStr && (
                   <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
                     <div className="font-semibold mb-1">{dateStr}</div>
                     {tooltip.day.mine && <div className="text-blue-300">✓ You're available</div>}
@@ -298,8 +305,8 @@ export default function Calendar({
           })}
         </div>
 
-        {/* Popup card — centered over the grid */}
-        {confirmedRange && (
+        {/* Popup card — desktop only */}
+        {!readOnly && confirmedRange && (
           <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
             <div
               ref={popupRef}
