@@ -25,23 +25,31 @@ export function pickDestination(continent: string, origin: string, exclude: stri
 }
 
 async function checkCache(origin: string, destination: string): Promise<number | null> {
-  const result = await query(
-    `SELECT price_usd FROM flight_cache
-     WHERE origin_iata = $1 AND destination_iata = $2
-       AND fetched_at > NOW() - INTERVAL '6 hours'`,
-    [origin, destination]
-  );
-  return result.rows.length > 0 ? (result.rows[0] as { price_usd: number | null }).price_usd : null;
+  try {
+    const result = await query(
+      `SELECT price_usd FROM flight_cache
+       WHERE origin_iata = $1 AND destination_iata = $2
+         AND fetched_at > NOW() - INTERVAL '6 hours'`,
+      [origin, destination]
+    );
+    return result.rows.length > 0 ? (result.rows[0] as { price_usd: number | null }).price_usd : null;
+  } catch {
+    return null; // table may not exist yet
+  }
 }
 
 async function upsertCache(origin: string, destination: string, price: number | null): Promise<void> {
-  await query(
-    `INSERT INTO flight_cache (origin_iata, destination_iata, price_usd, provider)
-     VALUES ($1, $2, $3, 'serpapi')
-     ON CONFLICT (origin_iata, destination_iata) DO UPDATE
-       SET price_usd = EXCLUDED.price_usd, fetched_at = NOW()`,
-    [origin, destination, price]
-  );
+  try {
+    await query(
+      `INSERT INTO flight_cache (origin_iata, destination_iata, price_usd, provider)
+       VALUES ($1, $2, $3, 'serpapi')
+       ON CONFLICT (origin_iata, destination_iata) DO UPDATE
+         SET price_usd = EXCLUDED.price_usd, fetched_at = NOW()`,
+      [origin, destination, price]
+    );
+  } catch {
+    // ignore cache write failures
+  }
 }
 
 /** Full fetch: cache → SerpAPI → mock fallback. Call for the user's own price. */

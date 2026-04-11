@@ -45,10 +45,10 @@ async function initDb() {
       UNIQUE(origin_iata, destination_iata)
     );
   `);
-}
 
-// Add continents column to existing databases that predate this migration
-pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS continents TEXT[] DEFAULT '{}'`).catch(console.error);
-pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS home_airport TEXT`).catch(console.error);
+  // Column migrations — safe to re-run
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS continents TEXT[] DEFAULT '{}'`);
+  await pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS home_airport TEXT`);
+}
 
 initDb().catch(console.error);

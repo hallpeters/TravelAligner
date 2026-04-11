@@ -116,6 +116,18 @@ type WindowMeta = {
 // ---- route handler ----
 
 export async function GET() {
+  try {
+    return await tripWindowsHandler();
+  } catch (err) {
+    console.error('trip-windows error:', err);
+    return NextResponse.json(
+      { myRanges: [], friendRanges: [], windowMeta: {}, userHasHomeAirport: false },
+      { status: 200 } // return 200 so the client parses the JSON and shows an empty state
+    );
+  }
+}
+
+async function tripWindowsHandler() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
