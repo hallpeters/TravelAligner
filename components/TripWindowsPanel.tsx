@@ -203,6 +203,7 @@ function WindowCard({
   labelOverride,
   onLabelSave,
   onDateRangeSave,
+  onDateRangeDelete,
 }: {
   window: TripWindow;
   expanded: boolean;
@@ -210,12 +211,14 @@ function WindowCard({
   labelOverride: string | null;
   onLabelSave: (label: string) => void;
   onDateRangeSave?: (id: number, start: string, end: string, label: string) => Promise<void>;
+  onDateRangeDelete?: (id: number) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editError, setEditError] = useState('');
 
   const visibleFriends = expanded ? w.friends : w.friends.slice(0, SHOW_LIMIT);
@@ -235,6 +238,12 @@ function WindowCard({
   function save() {
     onLabelSave(draft.trim());
     setEditing(false);
+  }
+
+  async function deleteGreyRange() {
+    setDeleting(true);
+    await onDateRangeDelete!(w.rangeId!);
+    setDeleting(false);
   }
 
   async function saveGreyEdit() {
@@ -304,13 +313,17 @@ function WindowCard({
             className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-400" />
           {editError && <p className="text-red-500 text-xs">{editError}</p>}
           <div className="flex gap-2">
-            <button onClick={saveGreyEdit} disabled={saving}
+            <button onClick={saveGreyEdit} disabled={saving || deleting}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 rounded-lg transition-colors disabled:opacity-50">
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button onClick={() => setEditing(false)}
-              className="flex-1 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium py-1.5 rounded-lg border border-gray-200 transition-colors">
+            <button onClick={() => setEditing(false)} disabled={saving || deleting}
+              className="flex-1 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium py-1.5 rounded-lg border border-gray-200 transition-colors disabled:opacity-50">
               Cancel
+            </button>
+            <button onClick={deleteGreyRange} disabled={saving || deleting}
+              className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-500 hover:text-red-600 text-xs font-medium rounded-lg border border-red-200 transition-colors disabled:opacity-50">
+              {deleting ? '…' : 'Delete'}
             </button>
           </div>
         </div>
@@ -359,6 +372,42 @@ function WindowCard({
   );
 }
 
+// ---- invite CTA ----
+
+function InviteCTA({ myRanges, onGoToFriends }: { myRanges: MyRange[]; onGoToFriends: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  function copyLink() {
+    navigator.clipboard.writeText(window.location.origin);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mb-5 rounded-xl border-2 border-blue-300 bg-blue-50 px-5 py-4 text-center animate-pulse [animation-iteration-count:3]">
+      <p className="text-xl mb-1">✈️</p>
+      <p className="text-base font-bold text-blue-900 mb-1">
+        You have {myRanges.length} travel {myRanges.length === 1 ? 'window' : 'windows'} ready
+      </p>
+      <p className="text-sm text-blue-700 mb-3">
+        Invite a friend to instantly see the trips you can take together.
+      </p>
+      <button
+        onClick={onGoToFriends}
+        className="w-full text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2.5 rounded-lg transition-colors mb-2"
+      >
+        Go to Friends →
+      </button>
+      <button
+        onClick={copyLink}
+        className="text-xs text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors"
+      >
+        {copied ? 'Copied!' : 'or copy invite link'}
+      </button>
+    </div>
+  );
+}
+
 // ---- main export ----
 
 const STORAGE_KEY = 'tripWindowLabels';
@@ -367,10 +416,14 @@ export default function TripWindowsPanel({
   refreshKey,
   onRefresh,
   onGoToFriends,
+  draggedRange,
+  onDragConsumed,
 }: {
   refreshKey: number;
   onRefresh: () => void;
   onGoToFriends?: () => void;
+  draggedRange?: { start: string; end: string } | null;
+  onDragConsumed?: () => void;
 }) {
   const [myRanges, setMyRanges] = useState<MyRange[]>([]);
   const [friendRanges, setFriendRanges] = useState<FriendRange[]>([]);
@@ -405,6 +458,15 @@ export default function TripWindowsPanel({
       });
   }, [refreshKey]);
 
+  useEffect(() => {
+    if (!draggedRange) return;
+    setStartDate(draggedRange.start);
+    setEndDate(draggedRange.end);
+    setRangeLabel('');
+    setFormError('');
+    setShowForm(true);
+  }, [draggedRange]);
+
   async function addRange(e: React.FormEvent) {
     e.preventDefault();
     if (!startDate || !endDate) { setFormError('Both dates are required'); return; }
@@ -422,6 +484,7 @@ export default function TripWindowsPanel({
       setEndDate('');
       setRangeLabel('');
       setShowForm(false);
+      onDragConsumed?.();
       onRefresh();
     } else {
       const d = await res.json();
@@ -456,6 +519,15 @@ export default function TripWindowsPanel({
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, start_date: start, end_date: end, label: label || null }),
+    });
+    onRefresh();
+  }
+
+  async function deleteRange(id: number) {
+    await fetch('/api/date-ranges', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
     });
     onRefresh();
   }
@@ -514,7 +586,7 @@ export default function TripWindowsPanel({
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-1.5 rounded-lg transition-colors disabled:opacity-50">
               {formLoading ? 'Adding…' : 'Add'}
             </button>
-            <button type="button" onClick={() => { setShowForm(false); setFormError(''); }}
+            <button type="button" onClick={() => { setShowForm(false); setFormError(''); onDragConsumed?.(); }}
               className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg">
               Cancel
             </button>
@@ -529,15 +601,7 @@ export default function TripWindowsPanel({
 
       {/* Invite prompt: has dates but no friends yet */}
       {!loading && myRanges.length > 0 && friendRanges.length === 0 && (
-        <div className="mb-5 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-center">
-          <p className="text-sm text-blue-800 font-medium mb-2">Now invite a friend to see when you can travel together</p>
-          <button
-            onClick={onGoToFriends}
-            className="text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-4 py-1.5 rounded-lg transition-colors"
-          >
-            Go to Friends
-          </button>
-        </div>
+        <InviteCTA myRanges={myRanges} onGoToFriends={onGoToFriends ?? (() => {})} />
       )}
 
       {loading ? (
@@ -557,6 +621,7 @@ export default function TripWindowsPanel({
               labelOverride={labelOverrides[w.id] ?? null}
               onLabelSave={label => saveLabel(w.id, label)}
               onDateRangeSave={saveDateRange}
+              onDateRangeDelete={deleteRange}
             />
           ))}
         </div>

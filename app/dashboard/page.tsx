@@ -13,7 +13,6 @@ export default function Dashboard() {
   const [tab, setTab] = useState<'calendar' | 'friends'>('calendar');
   const [calView, setCalView] = useState<'month' | 'year'>('month');
   const [pendingRequests, setPendingRequests] = useState(0);
-
   const refreshCalendar = useCallback(() => setCalendarKey(k => k + 1), []);
 
   async function fetchPendingRequests() {
@@ -100,7 +99,7 @@ export default function Dashboard() {
             {calView === 'month' ? (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div className="lg:sticky lg:top-20">
-                  <Calendar refreshKey={calendarKey} />
+                  <Calendar refreshKey={calendarKey} onSaved={refreshCalendar} />
                 </div>
                 <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
               </div>
