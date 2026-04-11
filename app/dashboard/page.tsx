@@ -36,7 +36,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
       <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
-        <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xl">✈️</span>
             <span className="font-bold text-gray-900">TravelSync</span>
@@ -73,7 +73,7 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-4">
+      <main className="max-w-7xl mx-auto px-4 py-4">
         {tab === 'calendar' ? (
           <div className="space-y-4">
             {/* Month / Year toggle */}
@@ -99,7 +99,7 @@ export default function Dashboard() {
             </div>
 
             {calView === 'month' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
                 <div className="lg:sticky lg:top-20">
                   <Calendar refreshKey={calendarKey} onSaved={refreshCalendar} />
                 </div>
@@ -109,7 +109,7 @@ export default function Dashboard() {
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
                 <div className="lg:sticky lg:top-20">
                   <YearOverview refreshKey={calendarKey} />
                 </div>

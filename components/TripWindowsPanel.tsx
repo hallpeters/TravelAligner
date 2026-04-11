@@ -654,7 +654,8 @@ export default function TripWindowsPanel({
       </div>
 
       {/* Type filters */}
-      <div className="flex flex-wrap gap-3 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <span className="text-[11px] text-gray-400 font-medium whitespace-nowrap">Show:</span>
         {([
           { type: 'grey' as const,   label: 'Your dates',            dot: 'bg-gray-400'   },
           { type: 'green' as const,  label: 'Potential trips',       dot: 'bg-green-500'  },
