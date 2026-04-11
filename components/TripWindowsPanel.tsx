@@ -203,6 +203,7 @@ function WindowCard({
   labelOverride,
   onLabelSave,
   onDateRangeSave,
+  onDateRangeDelete,
 }: {
   window: TripWindow;
   expanded: boolean;
@@ -210,12 +211,14 @@ function WindowCard({
   labelOverride: string | null;
   onLabelSave: (label: string) => void;
   onDateRangeSave?: (id: number, start: string, end: string, label: string) => Promise<void>;
+  onDateRangeDelete?: (id: number) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editError, setEditError] = useState('');
 
   const visibleFriends = expanded ? w.friends : w.friends.slice(0, SHOW_LIMIT);
@@ -235,6 +238,12 @@ function WindowCard({
   function save() {
     onLabelSave(draft.trim());
     setEditing(false);
+  }
+
+  async function deleteGreyRange() {
+    setDeleting(true);
+    await onDateRangeDelete!(w.rangeId!);
+    setDeleting(false);
   }
 
   async function saveGreyEdit() {
@@ -304,13 +313,17 @@ function WindowCard({
             className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white placeholder:text-gray-400" />
           {editError && <p className="text-red-500 text-xs">{editError}</p>}
           <div className="flex gap-2">
-            <button onClick={saveGreyEdit} disabled={saving}
+            <button onClick={saveGreyEdit} disabled={saving || deleting}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-1.5 rounded-lg transition-colors disabled:opacity-50">
               {saving ? 'Saving…' : 'Save'}
             </button>
-            <button onClick={() => setEditing(false)}
-              className="flex-1 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium py-1.5 rounded-lg border border-gray-200 transition-colors">
+            <button onClick={() => setEditing(false)} disabled={saving || deleting}
+              className="flex-1 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium py-1.5 rounded-lg border border-gray-200 transition-colors disabled:opacity-50">
               Cancel
+            </button>
+            <button onClick={deleteGreyRange} disabled={saving || deleting}
+              className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-500 hover:text-red-600 text-xs font-medium rounded-lg border border-red-200 transition-colors disabled:opacity-50">
+              {deleting ? '…' : 'Delete'}
             </button>
           </div>
         </div>
@@ -510,6 +523,15 @@ export default function TripWindowsPanel({
     onRefresh();
   }
 
+  async function deleteRange(id: number) {
+    await fetch('/api/date-ranges', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    });
+    onRefresh();
+  }
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       {/* Header + filter */}
@@ -599,6 +621,7 @@ export default function TripWindowsPanel({
               labelOverride={labelOverrides[w.id] ?? null}
               onLabelSave={label => saveLabel(w.id, label)}
               onDateRangeSave={saveDateRange}
+              onDateRangeDelete={deleteRange}
             />
           ))}
         </div>
