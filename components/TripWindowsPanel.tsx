@@ -13,6 +13,7 @@ type TripWindow = {
   label: string | null;
   friends: string[];
   rangeId?: number; // only set for grey cards (DB id)
+  price_usd?: number | null;
 };
 
 // ---- date helpers ----
@@ -145,7 +146,8 @@ function selectNonOverlapping(
 function generateWindows(
   myRanges: MyRange[],
   friendRanges: FriendRange[],
-  minDays: number
+  minDays: number,
+  windowPrices: Record<string, number | null> = {}
 ): TripWindow[] {
   // Grey cards: one per personal range, friends = those who cover the FULL range
   const grey: TripWindow[] = myRanges.map(r => ({
@@ -178,16 +180,26 @@ function generateWindows(
     'yellow', minDays, myRanges
   );
 
-  // Sort by: total people DESC → user-attending first → duration DESC
+  // Assign prices from server-fetched windowPrices map (green + yellow only)
+  const allWindows = [...grey, ...green, ...yellow].map(w => {
+    if (w.type === 'grey') return w;
+    const key = `${w.start_date}/${w.end_date}`;
+    return { ...w, price_usd: key in windowPrices ? windowPrices[key] : null };
+  });
+
+  // Sort by: total people DESC → user-attending first → price ASC (null last) → duration DESC
   function totalPeople(w: TripWindow) {
     return w.friends.length + (w.type !== 'yellow' ? 1 : 0);
   }
-  return [...grey, ...green, ...yellow].sort((a, b) => {
+  return allWindows.sort((a, b) => {
     const tDiff = totalPeople(b) - totalPeople(a);
     if (tDiff !== 0) return tDiff;
     const userA = a.type !== 'yellow' ? 1 : 0;
     const userB = b.type !== 'yellow' ? 1 : 0;
     if (userB !== userA) return userB - userA;
+    const priceA = a.price_usd ?? Infinity;
+    const priceB = b.price_usd ?? Infinity;
+    if (priceA !== priceB) return priceA - priceB;
     return dayCount(b.start_date, b.end_date) - dayCount(a.start_date, a.end_date);
   });
 }
@@ -351,6 +363,9 @@ function WindowCard({
         <span>·</span>
         <span>{days} {days === 1 ? 'day' : 'days'}</span>
       </div>
+      {(w.type === 'green' || w.type === 'yellow') && w.price_usd != null && (
+        <div className="mt-1 text-xs text-gray-400">~${w.price_usd} cheapest flight</div>
+      )}
 
       {/* Friend list */}
       {w.friends.length > 0 && (
@@ -427,6 +442,7 @@ export default function TripWindowsPanel({
 }) {
   const [myRanges, setMyRanges] = useState<MyRange[]>([]);
   const [friendRanges, setFriendRanges] = useState<FriendRange[]>([]);
+  const [windowPrices, setWindowPrices] = useState<Record<string, number | null>>({});
   const [minDays, setMinDays] = useState(1);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({});
@@ -454,6 +470,7 @@ export default function TripWindowsPanel({
       .then(data => {
         setMyRanges(data.myRanges ?? []);
         setFriendRanges(data.friendRanges ?? []);
+        setWindowPrices(data.windowPrices ?? {});
         setLoading(false);
       });
   }, [refreshKey]);
@@ -493,8 +510,8 @@ export default function TripWindowsPanel({
   }
 
   const windows = useMemo(
-    () => generateWindows(myRanges, friendRanges, minDays),
-    [myRanges, friendRanges, minDays]
+    () => generateWindows(myRanges, friendRanges, minDays, windowPrices),
+    [myRanges, friendRanges, minDays, windowPrices]
   );
 
   function toggleExpanded(id: string) {
