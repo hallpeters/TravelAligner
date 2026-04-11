@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import {
+  pickDestination,
+  getAirportCity,
+  getFlightPrice,
+  getFlightPriceCacheOnly,
+} from '@/lib/flightPrice';
 
-// ---- window-computation helpers (server-side, mirrors TripWindowsPanel algorithm) ----
+// ---- window-computation helpers ----
 
 type MyRange = { id: number; start_date: string; end_date: string; label: string | null };
 type FriendRange = { friend_name: string; start_date: string; end_date: string };
@@ -89,14 +95,25 @@ function selectNonOverlapping(
   return selected;
 }
 
-// ---- route handler ----
+// ---- types ----
+
+export type EnrichedContinent = {
+  continent: string;
+  count: number;
+  destination_iata: string | null;
+  destination_city: string | null;
+  user_price_usd: number | null;
+  avg_group_price_usd: number | null; // null if <2 prices available
+};
 
 type WindowMeta = {
-  topContinents: { continent: string; count: number }[];
-  price_usd: number | null;
+  topContinents: EnrichedContinent[];
+  price_usd: number | null; // top-1 user price, used for sorting
   destination_iata: string | null;
   flightContinent: string | null;
 };
+
+// ---- route handler ----
 
 export async function GET() {
   const session = await getSession();
@@ -116,16 +133,20 @@ export async function GET() {
     WHERE f.status = 'accepted' AND u.id != $1
   `, [session.userId])).rows as { id: number; username: string }[];
 
+  // Fetch current user's home_airport and continents
+  const userRow = (await query(
+    'SELECT home_airport, continents FROM users WHERE id = $1',
+    [session.userId]
+  )).rows[0] as { home_airport: string | null; continents: string[] | null } | undefined;
+  const userHomeAirport = userRow?.home_airport ?? null;
+  const userContinents = userRow?.continents ?? [];
+
   if (friends.length === 0) {
-    const earlyUserRow = (await query(
-      'SELECT home_airport FROM users WHERE id = $1',
-      [session.userId]
-    )).rows[0] as { home_airport: string | null } | undefined;
     return NextResponse.json({
       myRanges,
       friendRanges: [],
       windowMeta: {},
-      userHasHomeAirport: !!earlyUserRow?.home_airport,
+      userHasHomeAirport: !!userHomeAirport,
     });
   }
 
@@ -143,15 +164,7 @@ export async function GET() {
     end_date: r.end_date,
   }));
 
-  // Fetch current user's home_airport and continents
-  const userRow = (await query(
-    'SELECT home_airport, continents FROM users WHERE id = $1',
-    [session.userId]
-  )).rows[0] as { home_airport: string | null; continents: string[] | null } | undefined;
-  const userHomeAirport = userRow?.home_airport ?? null;
-  const userContinents = userRow?.continents ?? [];
-
-  // Fetch all friends' continents and home_airport in one query
+  // Fetch all friends' continents and home_airport
   const friendDataRows = (await query(
     'SELECT id, continents, home_airport FROM users WHERE id = ANY($1)',
     [friendIds]
@@ -165,41 +178,44 @@ export async function GET() {
     }
   }
 
-  // Compute actionable windows
+  // Compute windows
   const segments = computeSegments(myRanges, friendRanges);
   const spans = enumerateSpans(segments);
   const greenWindows = selectNonOverlapping(spans.filter(s => s.meInAll));
   const yellowWindows = selectNonOverlapping(spans.filter(s => !s.meInAll));
 
-  // Build windowMeta for all green+yellow windows
+  // Build initial windowMeta (continent counts only)
   const windowMeta: Record<string, WindowMeta> = {};
   for (const w of [...greenWindows, ...yellowWindows]) {
     const key = `${w.start}/${w.end}`;
     const continentCounts: Record<string, number> = {};
-    // Include current user's own continent preferences
     for (const c of userContinents) {
       continentCounts[c] = (continentCounts[c] ?? 0) + 1;
     }
-    // Include friends' continent preferences
     for (const fname of w.friends) {
       for (const c of nameToData.get(fname)?.continents ?? []) {
         continentCounts[c] = (continentCounts[c] ?? 0) + 1;
       }
     }
-    const topContinents = Object.entries(continentCounts)
-      .map(([continent, count]) => ({ continent, count }))
+    const topContinents: EnrichedContinent[] = Object.entries(continentCounts)
+      .map(([continent, count]) => ({
+        continent,
+        count,
+        destination_iata: null,
+        destination_city: null,
+        user_price_usd: null,
+        avg_group_price_usd: null,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 3);
 
     windowMeta[key] = { topContinents, price_usd: null, destination_iata: null, flightContinent: null };
   }
 
-  // Fetch flight prices for top 5 windows by friend count
+  // Enrich top-5 windows with destinations and prices
   const top5 = [...greenWindows, ...yellowWindows]
     .sort((a, b) => b.friends.length - a.friends.length)
     .slice(0, 5);
-
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
   await Promise.all(
     top5.map(async (w) => {
@@ -207,23 +223,54 @@ export async function GET() {
       const meta = windowMeta[key];
       if (!meta || meta.topContinents.length === 0 || !userHomeAirport) return;
 
-      const topContinent = meta.topContinents[0].continent;
-      const friendHomeAirports = w.friends
+      const friendAirports = w.friends
         .map(fname => nameToData.get(fname)?.home_airport)
         .filter((a): a is string => !!a);
-      const exclude = [...new Set(friendHomeAirports)].join(',');
+      // Exclude all group members' airports from destination selection
+      const excludeList = [...new Set([...friendAirports])];
 
-      try {
-        const res = await fetch(
-          `${appUrl}/api/flights?continent=${encodeURIComponent(topContinent)}&origin=${encodeURIComponent(userHomeAirport)}&exclude=${encodeURIComponent(exclude)}`
-        );
-        const data = await res.json();
-        meta.price_usd = typeof data.price_usd === 'number' ? data.price_usd : null;
-        meta.destination_iata = data.destination_iata ?? null;
-        meta.flightContinent = topContinent;
-      } catch {
-        // leave as null
-      }
+      // Enrich each continent row
+      meta.topContinents = await Promise.all(
+        meta.topContinents.map(async (tc, idx) => {
+          const destination = pickDestination(tc.continent, userHomeAirport, excludeList);
+          const city = destination ? getAirportCity(destination) : null;
+
+          let userPrice: number | null = null;
+          if (destination) {
+            if (idx === 0) {
+              // Top continent: full fetch (cache → SerpAPI → mock)
+              const result = await getFlightPrice(userHomeAirport, destination);
+              userPrice = result.price_usd;
+            } else {
+              // Lower-ranked: cache/mock only, no new API calls
+              userPrice = await getFlightPriceCacheOnly(userHomeAirport, destination);
+            }
+          }
+
+          // Group average: user + all friends in this window
+          let avgGroupPrice: number | null = null;
+          if (destination) {
+            const prices: number[] = [];
+            if (userPrice !== null) prices.push(userPrice);
+            for (const friendAirport of friendAirports) {
+              const fp = await getFlightPriceCacheOnly(friendAirport, destination);
+              if (fp !== null) prices.push(fp);
+            }
+            // Only show avg when we have prices from 2+ group members
+            if (prices.length >= 2) {
+              avgGroupPrice = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+            }
+          }
+
+          return { ...tc, destination_iata: destination, destination_city: city, user_price_usd: userPrice, avg_group_price_usd: avgGroupPrice };
+        })
+      );
+
+      // Top-level price for sorting = top-1 continent's user price
+      const top1 = meta.topContinents[0];
+      meta.price_usd = top1.user_price_usd;
+      meta.destination_iata = top1.destination_iata;
+      meta.flightContinent = top1.continent;
     })
   );
 

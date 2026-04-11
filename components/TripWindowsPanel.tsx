@@ -5,6 +5,15 @@ import { useState, useEffect, useMemo } from 'react';
 type MyRange = { id: number; start_date: string; end_date: string; label: string | null };
 type FriendRange = { friend_name: string; start_date: string; end_date: string };
 
+type EnrichedContinent = {
+  continent: string;
+  count: number;
+  destination_iata: string | null;
+  destination_city: string | null;
+  user_price_usd: number | null;
+  avg_group_price_usd: number | null;
+};
+
 type TripWindow = {
   id: string;
   type: 'grey' | 'green' | 'yellow';
@@ -14,13 +23,13 @@ type TripWindow = {
   friends: string[];
   rangeId?: number; // only set for grey cards (DB id)
   price_usd: number | null;
-  topContinents: { continent: string; count: number }[];
+  topContinents: EnrichedContinent[];
   destination_iata: string | null;
   flightContinent: string | null;
 };
 
 type WindowMeta = {
-  topContinents: { continent: string; count: number }[];
+  topContinents: EnrichedContinent[];
   price_usd: number | null;
   destination_iata: string | null;
   flightContinent: string | null;
@@ -159,7 +168,7 @@ function selectNonOverlapping(
       label,
       friends: c.friends,
       price_usd: null,
-      topContinents: [],
+      topContinents: [] as EnrichedContinent[],
       destination_iata: null,
       flightContinent: null,
     });
@@ -182,7 +191,7 @@ function generateWindows(
     label: r.label,
     rangeId: r.id,
     price_usd: null,
-    topContinents: [],
+    topContinents: [] as EnrichedContinent[],
     destination_iata: null,
     flightContinent: null,
     friends: [
@@ -401,20 +410,44 @@ function WindowCard({
         <span>{days} {days === 1 ? 'day' : 'days'}</span>
       </div>
       {(w.type === 'green' || w.type === 'yellow') && w.topContinents.length > 0 && (
-        <div className="mt-2">
-          <p className="text-[10px] text-gray-400 font-medium mb-1">Preferred destinations</p>
-          <div className="flex flex-wrap gap-1">
-            {w.topContinents.map(({ continent, count }) => (
-              <span key={continent} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                {CONTINENT_EMOJI[continent] ?? '🌍'} {continent} · {count}
-              </span>
+        <div className="mt-2.5 border-t border-gray-100 pt-2.5">
+          <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
+            Preferred destinations
+          </p>
+          <div className="space-y-2.5">
+            {w.topContinents.map(({ continent, count, destination_city, destination_iata, user_price_usd, avg_group_price_usd }) => (
+              <div key={continent} className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1 leading-tight">
+                    <span className="text-xs font-medium text-gray-700">
+                      {CONTINENT_EMOJI[continent] ?? '🌍'} {continent}
+                    </span>
+                    <span className="text-[10px] text-gray-400">· {count}</span>
+                  </div>
+                  {destination_city && destination_iata && (
+                    <div className="text-[10px] text-gray-400 mt-0.5 pl-4">
+                      {destination_city} ({destination_iata})
+                    </div>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  {user_price_usd != null ? (
+                    <>
+                      <div className="text-xs font-medium text-gray-700">~${user_price_usd}</div>
+                      {avg_group_price_usd != null && (
+                        <div className="text-[10px] text-gray-400">avg ${avg_group_price_usd}</div>
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              </div>
             ))}
           </div>
-          {w.price_usd != null && w.destination_iata ? (
-            <div className="mt-1 text-xs text-gray-400">~${w.price_usd} to {w.destination_iata} ({w.flightContinent})</div>
-          ) : !userHasHomeAirport ? (
-            <div className="mt-1 text-[10px] text-orange-400">Add your home airport to see flight estimates</div>
-          ) : null}
+          {!userHasHomeAirport && (
+            <p className="text-[10px] text-orange-400 mt-2">
+              Add your home airport above to see prices
+            </p>
+          )}
         </div>
       )}
 
