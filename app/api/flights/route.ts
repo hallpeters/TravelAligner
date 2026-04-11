@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
 
   const SERPAPI_KEY = process.env.SERPAPI_KEY;
   if (!SERPAPI_KEY) {
-    return NextResponse.json({ price_usd: null, provider: 'mock', cached: false });
+    // TODO: remove mock price before production — only here for visual testing without an API key
+    return NextResponse.json({ price_usd: 420, provider: 'mock', cached: false });
   }
 
   // Call SerpAPI
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ price_usd: price, provider: 'serpapi', cached: false });
   } catch {
-    return NextResponse.json({ price_usd: null, provider: 'mock', cached: false });
+    // TODO: remove mock price before production — only here for visual testing without an API key
+    return NextResponse.json({ price_usd: 420, provider: 'mock', cached: false });
   }
 }
