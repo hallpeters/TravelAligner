@@ -24,7 +24,7 @@ function friendCountColor(count: number, mine: boolean): string {
   return '';
 }
 
-export default function YearOverview({ refreshKey }: { refreshKey: number }) {
+export default function YearOverview({ refreshKey, headerRight }: { refreshKey: number; headerRight?: React.ReactNode }) {
   const today = new Date();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [year, setYear] = useState(today.getFullYear());
@@ -59,14 +59,17 @@ export default function YearOverview({ refreshKey }: { refreshKey: number }) {
           </svg>
         </button>
         <h2 className="text-xl font-semibold text-gray-900">{year}</h2>
-        <button
-          onClick={() => setYear(y => y + 1)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {headerRight}
+          <button
+            onClick={() => setYear(y => y + 1)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* 12 mini months */}

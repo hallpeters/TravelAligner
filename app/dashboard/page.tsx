@@ -32,6 +32,27 @@ export default function Dashboard() {
     router.push('/');
   }
 
+  const viewToggle = (
+    <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+      <button
+        onClick={() => setCalView('month')}
+        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+          calView === 'month' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        Month
+      </button>
+      <button
+        onClick={() => setCalView('year')}
+        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+          calView === 'year' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+        }`}
+      >
+        Year
+      </button>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navbar */}
@@ -75,50 +96,17 @@ export default function Dashboard() {
 
       <main className="max-w-7xl mx-auto px-4 py-4">
         {tab === 'calendar' ? (
-          <div className="space-y-4">
-            {/* Month / Year toggle */}
-            <div className="flex justify-end">
-              <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
-                <button
-                  onClick={() => setCalView('month')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    calView === 'month' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Month
-                </button>
-                <button
-                  onClick={() => setCalView('year')}
-                  className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    calView === 'year' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Year
-                </button>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
+            <div className="lg:sticky lg:top-20">
+              {calView === 'month'
+                ? <Calendar refreshKey={calendarKey} onSaved={refreshCalendar} headerRight={viewToggle} />
+                : <YearOverview refreshKey={calendarKey} headerRight={viewToggle} />
+              }
             </div>
-
-            {calView === 'month' ? (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
-                <div className="lg:sticky lg:top-20">
-                  <Calendar refreshKey={calendarKey} onSaved={refreshCalendar} />
-                </div>
-                <div className="flex flex-col gap-4">
-                  <TravelPreferences />
-                  <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
-                </div>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
-                <div className="lg:sticky lg:top-20">
-                  <YearOverview refreshKey={calendarKey} />
-                </div>
-                <div className="flex flex-col gap-4">
-                  <TravelPreferences />
-                  <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
-                </div>
-              </div>
-            )}
+            <div className="flex flex-col gap-4">
+              <TravelPreferences />
+              <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
+            </div>
           </div>
         ) : (
           <div className="max-w-md mx-auto">

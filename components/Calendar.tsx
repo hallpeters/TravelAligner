@@ -38,11 +38,13 @@ export default function Calendar({
   onSaved,
   readOnly,
   onDaySelected,
+  headerRight,
 }: {
   refreshKey: number;
   onSaved?: () => void;
   readOnly?: boolean;
   onDaySelected?: (date: string) => void;
+  headerRight?: React.ReactNode;
 }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -208,11 +210,14 @@ export default function Calendar({
         <h2 className="text-xl font-semibold text-gray-900">
           {MONTHS[month - 1]} {year}
         </h2>
-        <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-          <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-2">
+          {headerRight}
+          <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <svg className="w-5 h-5 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Hint while awaiting second click (desktop only) */}
