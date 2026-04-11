@@ -409,6 +409,28 @@ function WindowCard({
         <span>·</span>
         <span>{days} {days === 1 ? 'day' : 'days'}</span>
       </div>
+
+      {/* Friend list — comma-separated inline */}
+      {w.friends.length > 0 && (
+        <div className="mt-1 text-xs text-gray-500">
+          {visibleFriends.join(', ')}
+          {w.friends.length > SHOW_LIMIT && !expanded && (
+            <>
+              {' '}
+              <button onClick={onToggle} className="text-blue-500 hover:underline">
+                +{w.friends.length - SHOW_LIMIT} more
+              </button>
+            </>
+          )}
+          {expanded && w.friends.length > SHOW_LIMIT && (
+            <>
+              {' '}
+              <button onClick={onToggle} className="text-blue-500 hover:underline">show less</button>
+            </>
+          )}
+        </div>
+      )}
+
       {(w.type === 'green' || w.type === 'yellow') && w.topContinents.length > 0 && (
         <div className="mt-2.5 border-t border-gray-100 pt-2.5">
           <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-2">
@@ -451,22 +473,6 @@ function WindowCard({
         </div>
       )}
 
-      {/* Friend list */}
-      {w.friends.length > 0 && (
-        <div className="mt-1.5 space-y-0.5">
-          {visibleFriends.map(f => (
-            <div key={f} className="text-xs text-gray-700">· {f}</div>
-          ))}
-          {w.friends.length > SHOW_LIMIT && (
-            <button
-              onClick={onToggle}
-              className="text-xs text-blue-500 hover:underline mt-0.5"
-            >
-              {expanded ? 'Show less' : `Show all ${w.friends.length}`}
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }
