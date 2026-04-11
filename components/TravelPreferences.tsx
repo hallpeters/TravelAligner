@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import AirportSearch from '@/components/AirportSearch';
 
 const CONTINENTS = [
   'Africa',
@@ -42,15 +43,13 @@ export default function TravelPreferences() {
     setTimeout(() => setSaved(false), 1500);
   }
 
-  async function saveHomeAirport() {
-    const value = homeAirport.toUpperCase().trim();
-    if (!value) return;
+  async function handleAirportChange(iata: string) {
+    setHomeAirport(iata);
     await fetch('/api/user', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ home_airport: value }),
+      body: JSON.stringify({ home_airport: iata }),
     });
-    setHomeAirport(value);
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
   }
@@ -58,9 +57,11 @@ export default function TravelPreferences() {
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-700">Where do you want to travel?</h3>
+        <h3 className="text-sm font-semibold text-gray-700">Travel preferences</h3>
         {saved && <span className="text-xs text-green-600 font-medium">Saved</span>}
       </div>
+
+      <p className="text-xs text-gray-400 mb-2">Where do you want to go?</p>
       <div className="flex flex-wrap gap-2 mb-4">
         {CONTINENTS.map(c => {
           const active = selected.includes(c);
@@ -79,20 +80,9 @@ export default function TravelPreferences() {
           );
         })}
       </div>
-      <div>
-        <label className="text-xs font-medium text-gray-500 block mb-1">
-          Your home airport (IATA code)
-        </label>
-        <input
-          type="text"
-          value={homeAirport}
-          onChange={e => setHomeAirport(e.target.value)}
-          onBlur={saveHomeAirport}
-          placeholder="e.g. JFK"
-          maxLength={4}
-          className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400 uppercase"
-        />
-      </div>
+
+      <p className="text-xs text-gray-400 mb-1.5">Your home airport</p>
+      <AirportSearch value={homeAirport} onChange={handleAirportChange} />
     </div>
   );
 }

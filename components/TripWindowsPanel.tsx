@@ -251,6 +251,7 @@ function WindowCard({
   onLabelSave,
   onDateRangeSave,
   onDateRangeDelete,
+  userHasHomeAirport,
 }: {
   window: TripWindow;
   expanded: boolean;
@@ -259,6 +260,7 @@ function WindowCard({
   onLabelSave: (label: string) => void;
   onDateRangeSave?: (id: number, start: string, end: string, label: string) => Promise<void>;
   onDateRangeDelete?: (id: number) => Promise<void>;
+  userHasHomeAirport: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -399,16 +401,21 @@ function WindowCard({
         <span>{days} {days === 1 ? 'day' : 'days'}</span>
       </div>
       {(w.type === 'green' || w.type === 'yellow') && w.topContinents.length > 0 && (
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {w.topContinents.map(({ continent, count }) => (
-            <span key={continent} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-              {CONTINENT_EMOJI[continent] ?? '🌍'} {continent} · {count}
-            </span>
-          ))}
+        <div className="mt-2">
+          <p className="text-[10px] text-gray-400 font-medium mb-1">Preferred destinations</p>
+          <div className="flex flex-wrap gap-1">
+            {w.topContinents.map(({ continent, count }) => (
+              <span key={continent} className="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                {CONTINENT_EMOJI[continent] ?? '🌍'} {continent} · {count}
+              </span>
+            ))}
+          </div>
+          {w.price_usd != null && w.destination_iata ? (
+            <div className="mt-1 text-xs text-gray-400">~${w.price_usd} to {w.destination_iata} ({w.flightContinent})</div>
+          ) : !userHasHomeAirport ? (
+            <div className="mt-1 text-[10px] text-orange-400">Add your home airport to see flight estimates</div>
+          ) : null}
         </div>
-      )}
-      {(w.type === 'green' || w.type === 'yellow') && w.price_usd != null && w.destination_iata && (
-        <div className="mt-1 text-xs text-gray-400">~${w.price_usd} to {w.destination_iata} ({w.flightContinent})</div>
       )}
 
       {/* Friend list */}
@@ -487,6 +494,7 @@ export default function TripWindowsPanel({
   const [myRanges, setMyRanges] = useState<MyRange[]>([]);
   const [friendRanges, setFriendRanges] = useState<FriendRange[]>([]);
   const [windowMeta, setWindowMeta] = useState<Record<string, WindowMeta>>({});
+  const [userHasHomeAirport, setUserHasHomeAirport] = useState(false);
   const [minDays, setMinDays] = useState(1);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({});
@@ -515,6 +523,7 @@ export default function TripWindowsPanel({
         setMyRanges(data.myRanges ?? []);
         setFriendRanges(data.friendRanges ?? []);
         setWindowMeta(data.windowMeta ?? {});
+        setUserHasHomeAirport(data.userHasHomeAirport ?? false);
         setLoading(false);
       });
   }, [refreshKey]);
@@ -683,6 +692,7 @@ export default function TripWindowsPanel({
               onLabelSave={label => saveLabel(w.id, label)}
               onDateRangeSave={saveDateRange}
               onDateRangeDelete={deleteRange}
+              userHasHomeAirport={userHasHomeAirport}
             />
           ))}
         </div>

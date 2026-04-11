@@ -117,7 +117,16 @@ export async function GET() {
   `, [session.userId])).rows as { id: number; username: string }[];
 
   if (friends.length === 0) {
-    return NextResponse.json({ myRanges, friendRanges: [], windowMeta: {} });
+    const earlyUserRow = (await query(
+      'SELECT home_airport FROM users WHERE id = $1',
+      [session.userId]
+    )).rows[0] as { home_airport: string | null } | undefined;
+    return NextResponse.json({
+      myRanges,
+      friendRanges: [],
+      windowMeta: {},
+      userHasHomeAirport: !!earlyUserRow?.home_airport,
+    });
   }
 
   const friendIds = friends.map(f => f.id);
@@ -134,12 +143,13 @@ export async function GET() {
     end_date: r.end_date,
   }));
 
-  // Fetch current user's home_airport
+  // Fetch current user's home_airport and continents
   const userRow = (await query(
-    'SELECT home_airport FROM users WHERE id = $1',
+    'SELECT home_airport, continents FROM users WHERE id = $1',
     [session.userId]
-  )).rows[0] as { home_airport: string | null } | undefined;
+  )).rows[0] as { home_airport: string | null; continents: string[] | null } | undefined;
   const userHomeAirport = userRow?.home_airport ?? null;
+  const userContinents = userRow?.continents ?? [];
 
   // Fetch all friends' continents and home_airport in one query
   const friendDataRows = (await query(
@@ -166,6 +176,11 @@ export async function GET() {
   for (const w of [...greenWindows, ...yellowWindows]) {
     const key = `${w.start}/${w.end}`;
     const continentCounts: Record<string, number> = {};
+    // Include current user's own continent preferences
+    for (const c of userContinents) {
+      continentCounts[c] = (continentCounts[c] ?? 0) + 1;
+    }
+    // Include friends' continent preferences
     for (const fname of w.friends) {
       for (const c of nameToData.get(fname)?.continents ?? []) {
         continentCounts[c] = (continentCounts[c] ?? 0) + 1;
@@ -212,5 +227,5 @@ export async function GET() {
     })
   );
 
-  return NextResponse.json({ myRanges, friendRanges, windowMeta });
+  return NextResponse.json({ myRanges, friendRanges, windowMeta, userHasHomeAirport: !!userHomeAirport });
 }
