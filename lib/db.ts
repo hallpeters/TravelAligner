@@ -10,6 +10,7 @@ async function initDb() {
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
+      continents TEXT[] DEFAULT '{}',
       created_at TEXT DEFAULT NOW()::TEXT
     );
 
@@ -35,5 +36,8 @@ async function initDb() {
     );
   `);
 }
+
+// Add continents column to existing databases that predate this migration
+pool.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS continents TEXT[] DEFAULT '{}'`).catch(console.error);
 
 initDb().catch(console.error);

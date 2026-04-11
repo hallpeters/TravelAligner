@@ -6,6 +6,7 @@ import Calendar from '@/components/Calendar';
 import TripWindowsPanel from '@/components/TripWindowsPanel';
 import FriendsManager from '@/components/FriendsManager';
 import YearOverview from '@/components/YearOverview';
+import TravelPreferences from '@/components/TravelPreferences';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -101,14 +102,20 @@ export default function Dashboard() {
                 <div className="lg:sticky lg:top-20">
                   <Calendar refreshKey={calendarKey} onSaved={refreshCalendar} />
                 </div>
-                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
+                <div className="flex flex-col gap-4">
+                  <TravelPreferences />
+                  <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div className="lg:sticky lg:top-20">
                   <YearOverview refreshKey={calendarKey} />
                 </div>
-                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
+                <div className="flex flex-col gap-4">
+                  <TravelPreferences />
+                  <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
+                </div>
               </div>
             )}
           </div>
