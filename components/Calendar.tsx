@@ -44,6 +44,8 @@ export default function Calendar({
   // Two-click selection state
   const [selectionStart, setSelectionStart] = useState<string | null>(null);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
+  // Persists after second click until the user starts a new selection
+  const [confirmedRange, setConfirmedRange] = useState<{ start: string; end: string } | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const onDateSelectedRef = useRef(onDateSelected);
@@ -54,6 +56,7 @@ export default function Calendar({
     if (!selectionStart) return;
     function handleOutsideClick(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        // Cancel the pending first-click selection (but keep confirmedRange highlighted)
         setSelectionStart(null);
         setHoverDate(null);
       }
@@ -89,27 +92,29 @@ export default function Calendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Compute highlighted range
+  // Compute highlighted range — live preview while selecting, confirmed range otherwise
   const previewEnd = selectionStart ? (hoverDate ?? selectionStart) : null;
   const rangeStart = selectionStart && previewEnd
     ? (selectionStart <= previewEnd ? selectionStart : previewEnd)
-    : null;
+    : confirmedRange?.start ?? null;
   const rangeEnd = selectionStart && previewEnd
     ? (selectionStart <= previewEnd ? previewEnd : selectionStart)
-    : null;
+    : confirmedRange?.end ?? null;
 
   function handleDayClick(dateStr: string) {
     if (!selectionStart) {
-      // First click — begin selection
+      // First click — begin new selection, clearing any previous confirmed range
+      setConfirmedRange(null);
       setSelectionStart(dateStr);
       setHoverDate(dateStr);
       setTooltip(null);
     } else {
-      // Second click — confirm range
+      // Second click — confirm range, keep it highlighted
       const start = selectionStart <= dateStr ? selectionStart : dateStr;
       const end = selectionStart <= dateStr ? dateStr : selectionStart;
       setSelectionStart(null);
       setHoverDate(null);
+      setConfirmedRange({ start, end });
       onDateSelectedRef.current?.(start, end);
     }
   }
