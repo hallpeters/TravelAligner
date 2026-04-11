@@ -528,6 +528,7 @@ export default function TripWindowsPanel({
   const [friendRanges, setFriendRanges] = useState<FriendRange[]>([]);
   const [windowMeta, setWindowMeta] = useState<Record<string, WindowMeta>>({});
   const [userHasHomeAirport, setUserHasHomeAirport] = useState(false);
+  const [visibleTypes, setVisibleTypes] = useState<Set<TripWindow['type']>>(new Set(['grey', 'green', 'yellow']));
   const [minDays, setMinDays] = useState(1);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [labelOverrides, setLabelOverrides] = useState<Record<string, string>>({});
@@ -652,17 +653,33 @@ export default function TripWindowsPanel({
         </div>
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap gap-2 mb-4 text-[10px] text-gray-500">
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-sm bg-gray-400" /> Your dates
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-sm bg-green-500" /> Potential trip
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="inline-block w-2 h-2 rounded-sm bg-orange-400" /> Friends free - you're not
-        </span>
+      {/* Type filters */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        {([
+          { type: 'grey' as const,   label: 'Your dates',            dot: 'bg-gray-400'   },
+          { type: 'green' as const,  label: 'Potential trips',       dot: 'bg-green-500'  },
+          { type: 'yellow' as const, label: "Friends free · you're not", dot: 'bg-orange-400' },
+        ] as const).map(({ type, label, dot }) => {
+          const on = visibleTypes.has(type);
+          return (
+            <button
+              key={type}
+              onClick={() => setVisibleTypes(prev => {
+                const next = new Set(prev);
+                if (next.has(type)) next.delete(type); else next.add(type);
+                return next;
+              })}
+              className={`flex items-center gap-1.5 text-[11px] rounded-full px-2.5 py-1 border transition-colors ${
+                on
+                  ? 'border-gray-200 text-gray-700 bg-white'
+                  : 'border-gray-100 text-gray-300 bg-gray-50'
+              }`}
+            >
+              <span className={`inline-block w-2 h-2 rounded-sm shrink-0 ${on ? dot : 'bg-gray-200'}`} />
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Add date range */}
@@ -715,7 +732,7 @@ export default function TripWindowsPanel({
         </div>
       ) : (
         <div className="space-y-5">
-          {windows.map(w => (
+          {windows.filter(w => visibleTypes.has(w.type)).map(w => (
             <WindowCard
               key={w.id}
               window={w}
