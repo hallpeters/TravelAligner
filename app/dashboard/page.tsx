@@ -13,13 +13,7 @@ export default function Dashboard() {
   const [tab, setTab] = useState<'calendar' | 'friends'>('calendar');
   const [calView, setCalView] = useState<'month' | 'year'>('month');
   const [pendingRequests, setPendingRequests] = useState(0);
-  const [draggedRange, setDraggedRange] = useState<{ start: string; end: string } | null>(null);
-
   const refreshCalendar = useCallback(() => setCalendarKey(k => k + 1), []);
-  const handleDateSelected = useCallback((start: string, end: string) => {
-    setDraggedRange({ start, end });
-  }, []);
-  const handleDragConsumed = useCallback(() => setDraggedRange(null), []);
 
   async function fetchPendingRequests() {
     const res = await fetch('/api/friends');
@@ -105,16 +99,16 @@ export default function Dashboard() {
             {calView === 'month' ? (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div className="lg:sticky lg:top-20">
-                  <Calendar refreshKey={calendarKey} onDateSelected={handleDateSelected} />
+                  <Calendar refreshKey={calendarKey} onSaved={refreshCalendar} />
                 </div>
-                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} draggedRange={draggedRange} onDragConsumed={handleDragConsumed} />
+                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
               </div>
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
                 <div className="lg:sticky lg:top-20">
                   <YearOverview refreshKey={calendarKey} />
                 </div>
-                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} draggedRange={draggedRange} onDragConsumed={handleDragConsumed} />
+                <TripWindowsPanel refreshKey={calendarKey} onRefresh={refreshCalendar} onGoToFriends={() => setTab('friends')} />
               </div>
             )}
           </div>

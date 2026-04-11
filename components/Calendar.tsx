@@ -27,12 +27,18 @@ function friendCountColor(count: number, mine: boolean): string {
   return '';
 }
 
+function formatShort(d: string) {
+  const [, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m) - 1]} ${parseInt(day)}`;
+}
+
 export default function Calendar({
   refreshKey,
-  onDateSelected,
+  onSaved,
 }: {
   refreshKey: number;
-  onDateSelected?: (start: string, end: string) => void;
+  onSaved?: () => void;
 }) {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
@@ -41,29 +47,85 @@ export default function Calendar({
   const [tooltip, setTooltip] = useState<{ date: string; day: DayData } | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Two-click selection state
+  // Two-click selection
   const [selectionStart, setSelectionStart] = useState<string | null>(null);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
-  // Persists after second click until the user starts a new selection
   const [confirmedRange, setConfirmedRange] = useState<{ start: string; end: string } | null>(null);
 
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  const onDateSelectedRef = useRef(onDateSelected);
-  useEffect(() => { onDateSelectedRef.current = onDateSelected; }, [onDateSelected]);
+  // Popup form state
+  const [popupStart, setPopupStart] = useState('');
+  const [popupEnd, setPopupEnd] = useState('');
+  const [popupLabel, setPopupLabel] = useState('');
+  const [popupError, setPopupError] = useState('');
+  const [popupLoading, setPopupLoading] = useState(false);
 
-  // Clicking outside the calendar cancels the pending first-click
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  const onSavedRef = useRef(onSaved);
+  useEffect(() => { onSavedRef.current = onSaved; }, [onSaved]);
+
+  // Keep popup dates in sync with hover while selecting
   useEffect(() => {
     if (!selectionStart) return;
-    function handleOutsideClick(e: MouseEvent) {
+    const end = hoverDate ?? selectionStart;
+    const s = selectionStart <= end ? selectionStart : end;
+    const e = selectionStart <= end ? end : selectionStart;
+    setPopupStart(s);
+    setPopupEnd(e);
+  }, [selectionStart, hoverDate]);
+
+  // Cancel pending first-click if user clicks outside calendar
+  useEffect(() => {
+    if (!selectionStart) return;
+    function onOutside(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        // Cancel the pending first-click selection (but keep confirmedRange highlighted)
         setSelectionStart(null);
         setHoverDate(null);
       }
     }
-    document.addEventListener('mousedown', handleOutsideClick);
-    return () => document.removeEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
   }, [selectionStart]);
+
+  // Close popup when clicking outside it (but inside the calendar card)
+  useEffect(() => {
+    if (!confirmedRange) return;
+    function onOutside(e: MouseEvent) {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        cancelPopup();
+      }
+    }
+    document.addEventListener('mousedown', onOutside);
+    return () => document.removeEventListener('mousedown', onOutside);
+  }, [confirmedRange]);
+
+  function cancelPopup() {
+    setConfirmedRange(null);
+    setPopupLabel('');
+    setPopupError('');
+  }
+
+  async function savePopup() {
+    if (!popupStart || !popupEnd) { setPopupError('Both dates are required'); return; }
+    if (popupStart > popupEnd) { setPopupError('Start must be before end'); return; }
+    setPopupError('');
+    setPopupLoading(true);
+    const res = await fetch('/api/date-ranges', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ start_date: popupStart, end_date: popupEnd, label: popupLabel.trim() || null }),
+    });
+    setPopupLoading(false);
+    if (res.ok) {
+      setConfirmedRange(null);
+      setPopupLabel('');
+      setPopupError('');
+      onSavedRef.current?.();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setPopupError(d.error || 'Failed to save');
+    }
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -92,7 +154,7 @@ export default function Calendar({
   ];
   while (cells.length % 7 !== 0) cells.push(null);
 
-  // Compute highlighted range — live preview while selecting, confirmed range otherwise
+  // Compute highlighted range
   const previewEnd = selectionStart ? (hoverDate ?? selectionStart) : null;
   const rangeStart = selectionStart && previewEnd
     ? (selectionStart <= previewEnd ? selectionStart : previewEnd)
@@ -102,20 +164,28 @@ export default function Calendar({
     : confirmedRange?.end ?? null;
 
   function handleDayClick(dateStr: string) {
+    // If popup is open, a day click starts a fresh selection
+    if (confirmedRange) {
+      cancelPopup();
+      setSelectionStart(dateStr);
+      setHoverDate(dateStr);
+      setTooltip(null);
+      return;
+    }
     if (!selectionStart) {
-      // First click — begin new selection, clearing any previous confirmed range
-      setConfirmedRange(null);
       setSelectionStart(dateStr);
       setHoverDate(dateStr);
       setTooltip(null);
     } else {
-      // Second click — confirm range, keep it highlighted
       const start = selectionStart <= dateStr ? selectionStart : dateStr;
       const end = selectionStart <= dateStr ? dateStr : selectionStart;
       setSelectionStart(null);
       setHoverDate(null);
+      setPopupStart(start);
+      setPopupEnd(end);
+      setPopupLabel('');
+      setPopupError('');
       setConfirmedRange({ start, end });
-      onDateSelectedRef.current?.(start, end);
     }
   }
 
@@ -138,9 +208,9 @@ export default function Calendar({
         </button>
       </div>
 
-      {/* Hint text while awaiting second click */}
+      {/* Hint while awaiting second click */}
       {selectionStart && (
-        <p className="text-xs text-center text-blue-500 mb-2 -mt-3">
+        <p className="text-xs text-center text-blue-500 mb-2 -mt-4">
           Click a second date to complete your range
         </p>
       )}
@@ -152,81 +222,153 @@ export default function Calendar({
         ))}
       </div>
 
-      {/* Days grid */}
-      <div className={`grid grid-cols-7 gap-1 relative select-none ${loading ? 'opacity-50' : ''}`}>
-        {cells.map((day, i) => {
-          if (!day) return <div key={i} />;
-          const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          const dayData = data[dateStr];
-          const isToday = dateStr === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-          const colorClass = dayData ? friendCountColor(dayData.friendCount, dayData.mine) : '';
-          const inRange = !!(rangeStart && rangeEnd && dateStr >= rangeStart && dateStr <= rangeEnd);
-          const isAnchor = dateStr === selectionStart;
+      {/* Grid + popup wrapper */}
+      <div className="relative">
+        <div className={`grid grid-cols-7 gap-1 select-none ${loading ? 'opacity-50' : ''}`}>
+          {cells.map((day, i) => {
+            if (!day) return <div key={i} />;
+            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const dayData = data[dateStr];
+            const isToday = dateStr === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const colorClass = dayData ? friendCountColor(dayData.friendCount, dayData.mine) : '';
+            const inRange = !!(rangeStart && rangeEnd && dateStr >= rangeStart && dateStr <= rangeEnd);
+            const isAnchor = dateStr === selectionStart;
 
-          return (
-            <div
-              key={dateStr}
-              className={`relative aspect-square flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors
-                ${inRange
-                  ? isAnchor
-                    ? 'bg-blue-500 text-white ring-2 ring-blue-600'
-                    : 'bg-blue-100 ring-1 ring-blue-300'
-                  : `${colorClass || 'hover:bg-gray-50'} hover:scale-105 hover:shadow-sm`
-                }
-                ${isToday && !colorClass && !inRange ? 'ring-2 ring-blue-400' : ''}
-              `}
-              onClick={() => handleDayClick(dateStr)}
-              onMouseEnter={() => {
-                if (selectionStart) {
-                  setHoverDate(dateStr);
-                } else if (dayData && (dayData.mine || dayData.friendCount > 0)) {
-                  setTooltip({ date: dateStr, day: dayData });
-                }
-              }}
-              onMouseLeave={() => {
-                if (selectionStart) {
-                  setHoverDate(selectionStart);
-                } else {
-                  setTooltip(null);
-                }
-              }}
-            >
-              <span className={`text-sm font-medium
-                ${isAnchor ? 'text-white' : ''}
-                ${isToday && !colorClass && !inRange ? 'text-blue-600' : ''}
-              `}>
-                {day}
-              </span>
-              {!inRange && dayData?.friendCount > 0 && (
-                <span className="flex flex-col items-center leading-none">
-                  <span className="text-xs font-bold">
-                    {dayData.friendCount > 9 ? '9+' : dayData.friendCount}
-                  </span>
-                  <span className="text-[9px] opacity-70">
-                    {dayData.friendCount === 1 ? 'friend' : 'friends'}
-                  </span>
+            return (
+              <div
+                key={dateStr}
+                className={`relative aspect-square flex flex-col items-center justify-center rounded-xl cursor-pointer transition-colors
+                  ${inRange
+                    ? isAnchor
+                      ? 'bg-blue-500 text-white ring-2 ring-blue-600'
+                      : 'bg-blue-100 ring-1 ring-blue-300'
+                    : `${colorClass || 'hover:bg-gray-50'} hover:scale-105 hover:shadow-sm`
+                  }
+                  ${isToday && !colorClass && !inRange ? 'ring-2 ring-blue-400' : ''}
+                `}
+                onClick={() => handleDayClick(dateStr)}
+                onMouseEnter={() => {
+                  if (selectionStart) {
+                    setHoverDate(dateStr);
+                  } else if (!confirmedRange && dayData && (dayData.mine || dayData.friendCount > 0)) {
+                    setTooltip({ date: dateStr, day: dayData });
+                  }
+                }}
+                onMouseLeave={() => {
+                  if (selectionStart) {
+                    setHoverDate(selectionStart);
+                  } else {
+                    setTooltip(null);
+                  }
+                }}
+              >
+                <span className={`text-sm font-medium
+                  ${isAnchor ? 'text-white' : ''}
+                  ${isToday && !colorClass && !inRange ? 'text-blue-600' : ''}
+                `}>
+                  {day}
                 </span>
-              )}
-              {!inRange && dayData?.mine && dayData.friendCount === 0 && (
-                <div className="w-1 h-1 rounded-full bg-blue-400 mt-0.5" />
-              )}
+                {!inRange && dayData?.friendCount > 0 && (
+                  <span className="flex flex-col items-center leading-none">
+                    <span className="text-xs font-bold">
+                      {dayData.friendCount > 9 ? '9+' : dayData.friendCount}
+                    </span>
+                    <span className="text-[9px] opacity-70">
+                      {dayData.friendCount === 1 ? 'friend' : 'friends'}
+                    </span>
+                  </span>
+                )}
+                {!inRange && dayData?.mine && dayData.friendCount === 0 && (
+                  <div className="w-1 h-1 rounded-full bg-blue-400 mt-0.5" />
+                )}
 
-              {/* Tooltip — only when not in selection mode */}
-              {!selectionStart && tooltip?.date === dateStr && (
-                <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
-                  <div className="font-semibold mb-1">{dateStr}</div>
-                  {tooltip.day.mine && <div className="text-blue-300">✓ You're available</div>}
-                  {tooltip.day.friends.length > 0 && (
-                    <div className="text-green-300">
-                      {tooltip.day.friends.join(', ')}
-                    </div>
-                  )}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                {/* Tooltip */}
+                {!selectionStart && !confirmedRange && tooltip?.date === dateStr && (
+                  <div className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-xl">
+                    <div className="font-semibold mb-1">{dateStr}</div>
+                    {tooltip.day.mine && <div className="text-blue-300">✓ You're available</div>}
+                    {tooltip.day.friends.length > 0 && (
+                      <div className="text-green-300">{tooltip.day.friends.join(', ')}</div>
+                    )}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Popup card — centered over the grid */}
+        {confirmedRange && (
+          <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+            <div
+              ref={popupRef}
+              className="pointer-events-auto bg-white rounded-2xl shadow-2xl border border-gray-200 w-72 p-5"
+              onMouseDown={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm font-semibold text-gray-800">
+                  {formatShort(popupStart)} – {formatShort(popupEnd)}
+                </span>
+                <button
+                  onClick={cancelPopup}
+                  className="text-gray-400 hover:text-gray-600 transition-colors leading-none text-lg"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="Name (optional)"
+                  value={popupLabel}
+                  onChange={e => setPopupLabel(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') savePopup(); if (e.key === 'Escape') cancelPopup(); }}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-medium text-gray-400 mb-1 block uppercase tracking-wide">From</label>
+                    <input
+                      type="date"
+                      value={popupStart}
+                      onChange={e => setPopupStart(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-medium text-gray-400 mb-1 block uppercase tracking-wide">To</label>
+                    <input
+                      type="date"
+                      value={popupEnd}
+                      min={popupStart}
+                      onChange={e => setPopupEnd(e.target.value)}
+                      className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-              )}
+                {popupError && <p className="text-red-500 text-xs">{popupError}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={savePopup}
+                    disabled={popupLoading}
+                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {popupLoading ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={cancelPopup}
+                    className="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 border border-gray-200 rounded-lg transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
             </div>
-          );
-        })}
+          </div>
+        )}
       </div>
 
       {/* Legend */}
